@@ -292,6 +292,46 @@ def scrape_movie_details(url: str) -> dict | None:
 # Κύρια συνάρτηση scraping
 # ---------------------------------------------------------------------------
 
+def find_youtube_trailer(title: str, original_title: str = "", year: int | None = None) -> str | None:
+    """
+    Ψάχνει YouTube για trailer της ταινίας.
+    Επιστρέφει το πρώτο video ID ή None.
+    """
+    query = f"{title} trailer"
+    if year:
+        query += f" {year}"
+
+    import urllib.parse
+    search_url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
+
+    try:
+        resp = SESSION.get(search_url, timeout=10)
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        logger.warning("YouTube search αποτυχία για '%s': %s", title, e)
+        return None
+
+    # Εξαγωγή video IDs από το HTML (ytInitialData)
+    video_ids = re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', resp.text)
+    # Αφαίρεση duplicates διατηρώντας σειρά
+    seen = set()
+    unique_ids = []
+    for vid in video_ids:
+        if vid not in seen:
+            seen.add(vid)
+            unique_ids.append(vid)
+
+    if unique_ids:
+        logger.info("Βρέθηκε trailer για '%s': %s", title, unique_ids[0])
+        return unique_ids[0]
+
+    # Fallback: δοκιμή με original title
+    if original_title and original_title != title:
+        return find_youtube_trailer(original_title, year=year)
+
+    return None
+
+
 def run_scrape(scrape_id: str, mode: str = "full", full_rescrape: bool = False) -> None:
     """
     Εκτελεί scraping. Καλείται σε background thread.
