@@ -17,6 +17,7 @@ from firebase_client import (
     save_movie,
     get_movie,
     update_scrape_job,
+    clear_movies_collection,
 )
 
 logger = logging.getLogger(__name__)
@@ -633,3 +634,68 @@ def run_scrape(scrape_id: str, mode: str = "full", full_rescrape: bool = False) 
         "errors": errors,
     })
     logger.info("Ολοκλήρωση scraping [%s]: %d/%d ταινίες, %d σφάλματα", scrape_id, done, total_found, errors)
+
+
+def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
+    """
+    Test scraping: σβήνει ΟΛΟΚΛΗΡΗ τη βάση movies και φέρνει ακριβώς limit ταινίες.
+    Καλείται σε background thread.
+    """
+    logger.info("Test scraping [%s]: καθαρισμός βάσης + %d ταινίες", scrape_id, limit)
+
+    update_scrape_job(scrape_id, {"status": "running", "total": limit, "done": 0, "errors": 0})
+
+    cleared = clear_movies_collection()
+    logger.info("Διαγράφηκαν %d ταινίες από τη βάση", cleared)
+
+    done = 0
+    errors = 0
+    urls_seen = set()
+
+    try:
+        for movie_url in discover_movie_urls("full"):
+            if movie_url in urls_seen:
+                continue
+            urls_seen.add(movie_url)
+
+            if done >= limit:
+                break
+
+            update_scrape_job(scrape_id, {
+                "total": limit,
+                "done": done,
+                "errors": errors,
+                "status": "running",
+                "current_url": movie_url,
+            })
+
+            try:
+                data = scrape_movie_details(movie_url)
+                if data:
+                    save_movie(data)
+                    done += 1
+                    logger.debug("✓ Test: %s", data.get("title"))
+                else:
+                    errors += 1
+            except Exception as e:
+                errors += 1
+                logger.error("✗ Test σφάλμα για %s: %s", movie_url, e)
+
+    except Exception as e:
+        logger.error("Κρίσιμο σφάλμα test scraping: %s", e)
+        update_scrape_job(scrape_id, {
+            "status": "error",
+            "error_message": str(e),
+            "total": limit,
+            "done": done,
+            "errors": errors,
+        })
+        return
+
+    update_scrape_job(scrape_id, {
+        "status": "completed",
+        "total": limit,
+        "done": done,
+        "errors": errors,
+    })
+    logger.info("Test scraping [%s] ολοκληρώθηκε: %d ταινίες, %d σφάλματα", scrape_id, done, errors)

@@ -1050,6 +1050,8 @@ select option { background: var(--bg3); }
 .btn-admin-action:hover { color: var(--text); border-color: var(--accent); }
 .btn-admin-action.accent { background: var(--accent); color: #0a0a0f; border-color: var(--accent); font-weight: 600; }
 .btn-admin-action.accent:hover { background: var(--accent2); }
+.btn-test-scrape { background: #7c3a00; border-color: #e07b00; color: #ffb347; font-weight: 600; width: 100%; justify-content: center; }
+.btn-test-scrape:hover { background: #a35000; border-color: #ffb347; color: #fff; }
 
 .btn-admin-close {
   background: none;
