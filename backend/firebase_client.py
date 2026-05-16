@@ -182,6 +182,12 @@ def save_movie_imdb_url(movie_id: str, imdb_url: str) -> None:
     )
 
 
+def save_movie_tmdb_data(movie_id: str, data: dict) -> None:
+    """Αποθηκεύει δεδομένα TMDB enrichment σε υπάρχον movie doc."""
+    db = _get_db()
+    db.collection("movies").document(str(movie_id)).set(data, merge=True)
+
+
 def get_distinct_countries() -> list[str]:
     """Επιστρέφει λίστα χωρών για dropdown."""
     db = _get_db()

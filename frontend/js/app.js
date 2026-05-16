@@ -355,27 +355,9 @@ async function loadFiltersMeta() {
 }
 
 /* ==============================================
-   Modal
+   Modal field renderer (callable after enrichment)
 ============================================== */
-function openModal(movie, isUserEntry = false) {
-  state.currentMovie = movie;
-
-  document.getElementById('modalTitle').textContent = movie.title || '—';
-  document.getElementById('modalOriginal').textContent = movie.title_original || '';
-
-  // Stars (Athinorama) — κρυμμένα
-  document.getElementById('modalStars').innerHTML = '';
-
-  // Poster
-  const pWrap = document.getElementById('modalPoster');
-  const pUrl = movie.poster_url || movie.poster || '';
-  if (pUrl) {
-    pWrap.innerHTML = `<img src="${escHtml(pUrl)}" alt="${escHtml(movie.title)}" onerror="this.parentElement.innerHTML='<div class=modal-poster-placeholder>🎬</div>'" />`;
-  } else {
-    pWrap.innerHTML = '<div class="modal-poster-placeholder">🎬</div>';
-  }
-
-  // Meta (includes cast)
+function _updateModalFields(movie) {
   const genre    = Array.isArray(movie.genre)    ? movie.genre.join(', ')    : (movie.genre || '');
   const director = Array.isArray(movie.director) ? movie.director.join(', ') : (movie.director || '');
   const cast     = Array.isArray(movie.cast)     ? movie.cast.join(', ')     : (movie.cast || '');
@@ -396,18 +378,52 @@ function openModal(movie, isUserEntry = false) {
       <span class="modal-meta-value">${escHtml(String(v))}</span>
     </div>`).join('');
 
-  // Scores — μόνο IMDb
+  // IMDb score badge
   const scores = [];
   if (movie.imdb_score) scores.push(['IMDb', movie.imdb_score]);
   document.getElementById('modalScores').innerHTML = scores.map(([l, v]) =>
     `<div class="score-badge"><div class="score-label">${escHtml(l)}</div><div class="score-val">${escHtml(String(v))}</div></div>`
   ).join('');
 
+  // IMDb link
+  const imdbLink = document.getElementById('modalImdbLink');
+  if (movie.imdb_url) {
+    imdbLink.href = movie.imdb_url;
+    imdbLink.classList.remove('hidden');
+  }
+
   // Description
   const desc = movie.description || '';
   const descSec = document.getElementById('modalDescSection');
   document.getElementById('modalDesc').textContent = desc;
   descSec.style.display = desc ? '' : 'none';
+}
+
+/* ==============================================
+   Modal
+============================================== */
+function openModal(movie, isUserEntry = false) {
+  state.currentMovie = movie;
+
+  document.getElementById('modalTitle').textContent = movie.title || '—';
+  document.getElementById('modalOriginal').textContent = movie.title_original || '';
+
+  // Stars (Athinorama) — κρυμμένα
+  document.getElementById('modalStars').innerHTML = '';
+
+  // Κρύψε IMDb link μέχρι να επιβεβαιωθεί URL
+  document.getElementById('modalImdbLink').classList.add('hidden');
+
+  // Poster
+  const pWrap = document.getElementById('modalPoster');
+  const pUrl = movie.poster_url || movie.poster || '';
+  if (pUrl) {
+    pWrap.innerHTML = `<img src="${escHtml(pUrl)}" alt="${escHtml(movie.title)}" onerror="this.parentElement.innerHTML='<div class=modal-poster-placeholder>🎬</div>'" />`;
+  } else {
+    pWrap.innerHTML = '<div class="modal-poster-placeholder">🎬</div>';
+  }
+
+  _updateModalFields(movie);
 
   // Similar
   const similar = movie.similar || '';
@@ -423,20 +439,16 @@ function openModal(movie, isUserEntry = false) {
   athLink.href = url;
   athLink.style.display = url ? '' : 'none';
 
-  // IMDb link
-  const imdbLink = document.getElementById('modalImdbLink');
-  imdbLink.classList.add('hidden');
-  if (movie.imdb_url) {
-    imdbLink.href = movie.imdb_url;
-    imdbLink.classList.remove('hidden');
-  } else if (movie.id) {
-    api(`/api/movies/${encodeURIComponent(movie.id)}/imdb`)
-      .then(res => {
-        if (res && res.imdb_url) {
-          imdbLink.href = res.imdb_url;
-          imdbLink.classList.remove('hidden');
-          movie.imdb_url = res.imdb_url;
-        }
+  // TMDB enrichment — αν λείπουν βασικά πεδία, φέρε τα on-demand
+  const needsEnrich = movie.id && !movie.tmdb_id && (
+    !movie.genre?.length || !movie.director?.length || !movie.cast?.length || !movie.imdb_score
+  );
+  if (needsEnrich) {
+    api(`/api/movies/${encodeURIComponent(movie.id)}/enrich`)
+      .then(enriched => {
+        if (!enriched || enriched.enriched === false) return;
+        Object.assign(movie, enriched);
+        _updateModalFields(movie);
       })
       .catch(() => {});
   }
