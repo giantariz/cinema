@@ -392,19 +392,12 @@ function _updateModalFields(movie) {
   // Tagline
   document.getElementById('modalTagline').textContent = movie.tagline || '';
 
-  // Ratings row
+  // Ratings row — μόνο TMDB score
   const ratingsEl = document.getElementById('modalRatings');
   let ratingsHtml = '';
-  if (movie.stars) {
-    ratingsHtml += `<div class="modal-rating-ath">
-      <span class="stars-display">${renderStars(movie.stars)}</span>
-      <span class="modal-rating-ath-text">(${movie.stars}/5 Athinorama)</span>
-    </div>`;
-  }
   if (movie.imdb_score) {
-    if (ratingsHtml) ratingsHtml += '<div class="modal-rating-divider"></div>';
     const votes = movie.vote_count ? ` · ${(movie.vote_count / 1000).toFixed(0)}K ψήφοι` : '';
-    ratingsHtml += `<div class="modal-rating-tmdb">
+    ratingsHtml = `<div class="modal-rating-tmdb">
       <span class="modal-rating-tmdb-score">${movie.imdb_score}</span>
       <span class="modal-rating-tmdb-max">/10</span>
       <span class="modal-rating-tmdb-label">TMDB${votes}</span>
