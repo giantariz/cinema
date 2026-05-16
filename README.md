@@ -1,6 +1,6 @@
 # 🎬 Αθηνόραμα Αρχείο Ταινιών
 
-Searchable movie database populated by scraping the [Athinorama](https://www.athinorama.gr) movie archive. Features a Python/Flask API, Vanilla JS frontend, and Firebase Firestore database — deployable on Railway + Netlify.
+Searchable movie database populated by scraping the [Athinorama](https://www.athinorama.gr) movie archive. Features a Python/Flask API, Vanilla JS frontend, and Firebase Firestore database — backend on Google Cloud Run, frontend on Netlify.
 
 ---
 
@@ -55,11 +55,12 @@ athinorama-archive/
    ```
    (χρειάζεται το Firebase CLI: `npm install -g firebase-tools`)
 
-### 2. Backend — Railway
+### 2. Backend — Google Cloud Run
 
-1. Πήγαινε στο [railway.app](https://railway.app) → New Project → Deploy from GitHub
-2. Επέλεξε αυτό το repo
-3. **Environment Variables** (Settings → Variables):
+1. Πήγαινε στο [Google Cloud Console](https://console.cloud.google.com/) → Cloud Run → **Create service**
+2. Επέλεξε **"Continuously deploy from a repository"** → σύνδεσε το GitHub repo
+3. Source directory: `backend`, Branch: `main`
+4. **Environment Variables** (Edit & Deploy New Revision → Variables & Secrets):
 
 | Variable | Τιμή |
 |---|---|
@@ -69,7 +70,7 @@ athinorama-archive/
 | `SCRAPE_API_KEY` | Τυχαίο string για προστασία scrape endpoint |
 | `SYNC_API_KEY` | Τυχαίο string για Google Sheets sync |
 
-4. Railway θα χρησιμοποιήσει το `railway.json` για build/start
+5. Το `backend/Dockerfile` χρησιμοποιείται αυτόματα για το build.
 
 ### 3. Frontend — Netlify
 
@@ -80,10 +81,10 @@ athinorama-archive/
    - (Χωρίς build command — static HTML)
 4. **Άλλαξε το BACKEND_URL** στο `frontend/index.html`:
    ```javascript
-   const BACKEND_URL = 'https://your-app.railway.app';
+   const BACKEND_URL = 'https://your-service-region.run.app';
    ```
-   Αντικατάστησε με το Railway URL σου.
-5. Ενημέρωσε και το `ALLOWED_ORIGINS` στο Railway με το Netlify URL σου.
+   Αντικατάστησε με το Cloud Run URL σου.
+5. Ενημέρωσε και το `ALLOWED_ORIGINS` στο Cloud Run με το Netlify URL σου.
 
 ### 4. GitHub Secrets (για weekly scraping)
 
@@ -91,8 +92,8 @@ Settings → Secrets → Actions:
 
 | Secret | Τιμή |
 |---|---|
-| `BACKEND_URL` | URL του Railway backend |
-| `SCRAPE_API_KEY` | Το ίδιο key που έβαλες στο Railway |
+| `BACKEND_URL` | URL του Cloud Run service |
+| `SCRAPE_API_KEY` | Το ίδιο key που έβαλες στο Cloud Run |
 
 ---
 
@@ -149,7 +150,7 @@ const BACKEND_URL = 'http://localhost:5000';
 3. Διέγραψε τον υπάρχοντα κώδικα και επικόλλησε το περιεχόμενο του `apps_script/sync_to_backend.gs`
 4. Ρύθμισε τις μεταβλητές στην αρχή του αρχείου:
    ```javascript
-   const BACKEND_URL = 'https://your-app.railway.app';
+   const BACKEND_URL = 'https://your-service-region.run.app';
    const SYNC_API_KEY = 'your-sync-api-key';
    ```
 5. **Αποθήκευσε** (Ctrl+S)
@@ -181,7 +182,7 @@ title | year | genre | imdb_score | tmdb_score | rotten_tomatoes | cast | direct
 ### Base URL
 
 ```
-https://your-app.railway.app
+https://your-service-region.run.app
 ```
 
 ### Endpoints
@@ -291,10 +292,10 @@ Sync από Google Sheets. Requires `Authorization: Bearer <SYNC_API_KEY>`.
 | Βήμα | Περιγραφή |
 |---|---|
 | Firebase project | Δημιουργία project + Firestore + service account key |
-| Railway deploy | Σύνδεση repo + environment variables |
+| Cloud Run deploy | Σύνδεση repo + environment variables στο Cloud Run |
 | Netlify deploy | Σύνδεση repo + ενημέρωση BACKEND_URL στο index.html |
 | GitHub Secrets | `BACKEND_URL` + `SCRAPE_API_KEY` για weekly scrape |
-| Apps Script | Copy-paste στο Google Spreadsheet + ρύθμιση BACKEND_URL/SYNC_API_KEY |
+| Apps Script | Copy-paste στο Google Spreadsheet + ρύθμιση BACKEND_URL (Cloud Run URL)/SYNC_API_KEY |
 | Firestore indexes | `firebase deploy --only firestore:indexes` |
 | Πρώτο scraping | Από το admin panel (⚙) → mode: full → Έναρξη |
 
