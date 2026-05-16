@@ -593,14 +593,46 @@ def find_tmdb_data(title: str, original_title: str = "", year: int | None = None
         logger.info("TMDB: δεν βρέθηκε αποτέλεσμα για '%s'", title)
         return None
 
-    # Βρες το καλύτερο match βάσει έτους
+    # Βρες το καλύτερο match βάσει ομοιότητας τίτλου και έτους
+    def _title_similarity(a: str, b: str) -> float:
+        a, b = a.lower().strip(), b.lower().strip()
+        if not a or not b:
+            return 0.0
+        if a == b:
+            return 1.0
+        longer, shorter = (a, b) if len(a) >= len(b) else (b, a)
+        matches = sum(c in longer for c in shorter)
+        return matches / len(longer)
+
+    search_title = (original_title or title).lower().strip()
+
+    def _score(r: dict) -> tuple:
+        rel_year = int((r.get("release_date") or "0-01-01")[:4] or "0")
+        year_diff = abs(rel_year - int(year)) if year and rel_year else 999
+        title_score = max(
+            _title_similarity(search_title, r.get("title", "")),
+            _title_similarity(search_title, r.get("original_title", "")),
+        )
+        return (year_diff, -title_score)
+
+    results.sort(key=_score)
     best = results[0]
-    if year:
-        for r in results:
-            rel_year = int((r.get("release_date") or "0-01-01")[:4] or "0")
-            if abs(rel_year - int(year)) <= 1:
-                best = r
-                break
+
+    # Απόρριψη αν το match είναι πολύ κακό (έτος > 2 χρόνια διαφορά ΚΑΙ τίτλος ανόμοιος)
+    if year or search_title:
+        rel_year = int((best.get("release_date") or "0-01-01")[:4] or "0")
+        year_diff = abs(rel_year - int(year)) if year and rel_year else 0
+        title_score = max(
+            _title_similarity(search_title, best.get("title", "")),
+            _title_similarity(search_title, best.get("original_title", "")),
+        )
+        if year_diff > 2 and title_score < 0.4:
+            logger.warning(
+                "TMDB: δεν βρέθηκε αξιόπιστο match για '%s' (%s) — "
+                "καλύτερο αποτέλεσμα: '%s' (%s), year_diff=%d, title_score=%.2f",
+                title, year, best.get("title"), rel_year, year_diff, title_score,
+            )
+            return None
 
     tmdb_id = best["id"]
 
