@@ -517,10 +517,11 @@ function openModal(movie, isUserEntry = false) {
   athLink.href = url;
   athLink.style.display = url ? '' : 'none';
 
-  // TMDB enrichment — αν λείπουν βασικά πεδία, φέρε τα on-demand
-  const needsEnrich = movie.id && !movie.tmdb_id && (
-    !movie.genre?.length || !movie.director?.length || !movie.cast?.length || !movie.imdb_score
-  );
+  // TMDB enrichment — καλείται αν: δεν υπάρχει tmdb_id ΚΑΙ λείπουν βασικά πεδία,
+  // ή υπάρχει tmdb_id αλλά λείπουν τα νέα πεδία (backdrop, tagline, cast_roles)
+  const missingBasic = !movie.genre?.length || !movie.director?.length || !movie.cast?.length || !movie.imdb_score;
+  const missingNew   = !movie.backdrop_path && !movie.tagline && !movie.cast_roles?.length;
+  const needsEnrich  = movie.id && ((!movie.tmdb_id && missingBasic) || missingNew);
   if (needsEnrich) {
     api(`/api/movies/${encodeURIComponent(movie.id)}/enrich`)
       .then(enriched => {

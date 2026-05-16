@@ -223,35 +223,47 @@ def get_movie_imdb(movie_id: str):
 # TMDB enrichment endpoint
 # ---------------------------------------------------------------------------
 
+_ENRICH_FIELDS = (
+    "genre", "director", "cast", "cast_roles", "description",
+    "imdb_score", "vote_count", "imdb_url", "imdb_id",
+    "tagline", "backdrop_path", "original_language", "production_companies",
+    "tmdb_trailer_key",
+)
+# Πεδία που θεωρούνται "νέα" — αν λείπουν από ταινίες με tmdb_id, κάνουμε re-fetch
+_NEW_FIELDS = ("backdrop_path", "cast_roles", "tagline", "vote_count", "production_companies", "original_language")
+
+
 @app.get("/api/movies/<movie_id>/enrich")
 def enrich_movie(movie_id: str):
-    """Εμπλουτισμός ταινίας με δεδομένα από TMDB (genre, cast, director, score, IMDb URL)."""
+    """Εμπλουτισμός ταινίας με δεδομένα από TMDB."""
     try:
         movie = db.get_movie(movie_id)
         if not movie:
             return jsonify({"error": "Η ταινία δεν βρέθηκε"}), 404
 
-        # Αν υπάρχει ήδη tmdb_id, τα δεδομένα έχουν ήδη ληφθεί
-        if movie.get("tmdb_id"):
+        existing_tmdb_id = movie.get("tmdb_id")
+        missing_new = any(not movie.get(f) for f in _NEW_FIELDS)
+
+        # Αν έχει tmdb_id ΚΑΙ όλα τα νέα πεδία → τίποτα να κάνουμε
+        if existing_tmdb_id and not missing_new:
             return jsonify(movie), 200
 
-        tmdb_data = scraper.find_tmdb_data(
-            title=movie.get("title", ""),
-            original_title=movie.get("title_original", ""),
-            year=movie.get("year"),
-        )
+        # Αν έχει tmdb_id αλλά λείπουν νέα πεδία → fetch απευθείας με ID (χωρίς search)
+        if existing_tmdb_id:
+            tmdb_data = scraper.fetch_tmdb_data_by_id(existing_tmdb_id)
+        else:
+            tmdb_data = scraper.find_tmdb_data(
+                title=movie.get("title", ""),
+                original_title=movie.get("title_original", ""),
+                year=movie.get("year"),
+            )
 
         if not tmdb_data:
             return jsonify({"enriched": False, **movie}), 200
 
         # Ενημέρωσε μόνο κενά πεδία (μη αντικατάσταση υπαρχόντων)
         update = {"tmdb_id": tmdb_data["tmdb_id"]}
-        for field in (
-            "genre", "director", "cast", "cast_roles", "description",
-            "imdb_score", "vote_count", "imdb_url", "imdb_id",
-            "tagline", "backdrop_path", "original_language", "production_companies",
-            "tmdb_trailer_key",
-        ):
+        for field in _ENRICH_FIELDS:
             if tmdb_data.get(field) and not movie.get(field):
                 update[field] = tmdb_data[field]
 

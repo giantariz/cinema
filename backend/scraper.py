@@ -616,6 +616,12 @@ def find_tmdb_data(title: str, original_title: str = "", year: int | None = None
         logger.warning("TMDB details αποτυχία για id=%s: %s", tmdb_id, e)
         return None
 
+    logger.info("TMDB εμπλουτισμός για '%s' (tmdb_id=%s)", title, tmdb_id)
+    return _parse_tmdb_response(data, tmdb_id)
+
+
+def _parse_tmdb_response(data: dict, tmdb_id: int) -> dict:
+    """Εξάγει όλα τα πεδία από TMDB movie response dict."""
     genres    = [g["name"] for g in data.get("genres", [])]
     credits   = data.get("credits", {})
     directors = [c["name"] for c in credits.get("crew", []) if c.get("job") == "Director"]
@@ -632,7 +638,6 @@ def find_tmdb_data(title: str, original_title: str = "", year: int | None = None
     orig_lang = data.get("original_language") or None
     prod_cos  = [c["name"] for c in data.get("production_companies", [])[:3]] or None
 
-    # Trailer από TMDB videos (προτιμάμε Official Trailer, αλλιώς πρώτο Trailer)
     tmdb_trailer_key = None
     videos = data.get("videos", {}).get("results", [])
     for v in videos:
@@ -645,7 +650,6 @@ def find_tmdb_data(title: str, original_title: str = "", year: int | None = None
                 tmdb_trailer_key = v["key"]
                 break
 
-    logger.info("TMDB εμπλουτισμός για '%s' (tmdb_id=%s)", title, tmdb_id)
     return {
         "tmdb_id":              tmdb_id,
         "genre":                genres,
@@ -663,6 +667,26 @@ def find_tmdb_data(title: str, original_title: str = "", year: int | None = None
         "production_companies": prod_cos,
         "tmdb_trailer_key":     tmdb_trailer_key or None,
     }
+
+
+def fetch_tmdb_data_by_id(tmdb_id: int) -> dict | None:
+    """
+    Φέρνει TMDB δεδομένα απευθείας με γνωστό tmdb_id (χωρίς search).
+    Χρησιμοποιείται για re-enrich ταινιών που έχουν ήδη tmdb_id.
+    """
+    if not TMDB_API_KEY:
+        return None
+    try:
+        r = requests.get(
+            f"{TMDB_BASE}/movie/{tmdb_id}",
+            params={"api_key": TMDB_API_KEY, "append_to_response": "credits,videos", "language": "el"},
+            timeout=10,
+        )
+        r.raise_for_status()
+        return _parse_tmdb_response(r.json(), tmdb_id)
+    except Exception as e:
+        logger.warning("TMDB fetch_by_id αποτυχία για id=%s: %s", tmdb_id, e)
+        return None
 
 
 def run_scrape(scrape_id: str, mode: str = "full", full_rescrape: bool = False) -> None:
