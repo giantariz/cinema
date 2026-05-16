@@ -408,14 +408,14 @@ function _updateModalFields(movie) {
   // Cast: prefer cast_roles (with characters), fall back to plain cast
   let castHtml = '';
   if (Array.isArray(movie.cast_roles) && movie.cast_roles.length) {
-    castHtml = `<div class="cast-roles-list">${movie.cast_roles.map(r => {
+    castHtml = `<div class="cast-roles-list">${movie.cast_roles.slice(0, 3).map(r => {
       const char = r.character ? ` <span class="cast-role-char">ως ${escHtml(r.character)}</span>` : '';
       return `<div class="cast-role-item"><span class="cast-role-name">${escHtml(r.name)}</span>${char}</div>`;
     }).join('')}</div>`;
   } else if (Array.isArray(movie.cast) && movie.cast.length) {
-    castHtml = escHtml(movie.cast.join(', '));
+    castHtml = escHtml(movie.cast.slice(0, 3).join(', '));
   } else if (typeof movie.cast === 'string' && movie.cast) {
-    castHtml = escHtml(movie.cast);
+    castHtml = escHtml(movie.cast.split(',').slice(0, 3).join(',').trim());
   }
 
   // Production companies

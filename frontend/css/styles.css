@@ -748,6 +748,7 @@ select option { background: var(--bg3); }
   aspect-ratio: 2/3;
   background: var(--bg3);
   flex-shrink: 0;
+  align-self: flex-start;
 }
 .modal-poster img {
   width: 100%;
