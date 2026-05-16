@@ -188,6 +188,38 @@ def get_movie_trailer(movie_id: str):
 
 
 # ---------------------------------------------------------------------------
+# IMDb endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/api/movies/<movie_id>/imdb")
+def get_movie_imdb(movie_id: str):
+    """Επιστρέφει IMDb URL για την ταινία (cached ή αναζητείται on-demand)."""
+    try:
+        movie = db.get_movie(movie_id)
+        if not movie:
+            return jsonify({"error": "Η ταινία δεν βρέθηκε"}), 404
+
+        if movie.get("imdb_url"):
+            return jsonify({"imdb_url": movie["imdb_url"]}), 200
+
+        imdb_url = scraper.find_imdb_url(
+            title=movie.get("title", ""),
+            original_title=movie.get("title_original", ""),
+            year=movie.get("year"),
+        )
+
+        if imdb_url:
+            db.save_movie_imdb_url(movie_id, imdb_url)
+            return jsonify({"imdb_url": imdb_url}), 200
+
+        return jsonify({"imdb_url": None}), 200
+
+    except Exception as e:
+        logger.error("Σφάλμα get_movie_imdb %s: %s", movie_id, e)
+        return jsonify({"error": "Εσωτερικό σφάλμα"}), 500
+
+
+# ---------------------------------------------------------------------------
 # Scraping endpoints
 # ---------------------------------------------------------------------------
 

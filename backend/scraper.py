@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://www.athinorama.gr"
 ARCHIVE_URL = f"{BASE_URL}/cinema/cinema-reviews/"
+MOVIEARCHIVE_URL = f"{BASE_URL}/cinema/moviearchive/"
 
 HEADERS = {
     "User-Agent": (
@@ -151,15 +152,37 @@ def _extract_movie_links(soup: BeautifulSoup) -> list[str]:
         if not href:
             continue
         full_url = href if href.startswith("http") else BASE_URL + href
-        # Φιλτράρουμε: πρέπει να έχει ID (αριθμό) μετά το /cinema-reviews/
         if re.search(r"/cinema-reviews/\d+/", full_url) and full_url not in seen:
             seen.add(full_url)
             results.append(full_url)
     return results
 
 
+def _extract_movie_links_flexible(soup: BeautifulSoup) -> list[str]:
+    """Εξάγει URLs ταινιών από moviearchive ή cinema-reviews σελίδες."""
+    seen = set()
+    results = []
+    patterns = [
+        r"/cinema/cinema-reviews/\d+",
+        r"/cinema/movies/\d+",
+        r"/cinema/\w+-reviews/\d+",
+    ]
+    for a in soup.find_all("a", href=True):
+        href = a.get("href", "")
+        if not href:
+            continue
+        full_url = href if href.startswith("http") else BASE_URL + href
+        for pattern in patterns:
+            if re.search(pattern, full_url) and full_url not in seen:
+                seen.add(full_url)
+                results.append(full_url)
+                break
+    return results
+
+
 def _discover_full() -> Generator[str, None, None]:
-    """Scraping ολόκληρου αρχείου μέσω paginated λίστας."""
+    """Scraping ολόκληρου αρχείου: πρώτα cinema-reviews, μετά moviearchive (1-10)."""
+    # Φάση 1: cinema-reviews paginated archive
     page = 1
     while True:
         url = f"{ARCHIVE_URL}?page={page}"
@@ -180,6 +203,48 @@ def _discover_full() -> Generator[str, None, None]:
         if not next_link:
             break
         page += 1
+
+    # Φάση 2: moviearchive pages (βαθμολογία 1=0.5★ εως 10=5★)
+    yield from _discover_moviearchive()
+
+
+def _discover_moviearchive() -> Generator[str, None, None]:
+    """
+    Scraping του αρχείου moviearchive του Athinorama.
+    10 σελίδες βαθμολογίας (1=0.5★ εως 10=5★), καθεμία με pagination.
+    Περιέχει ~17.000 ταινίες συνολικά.
+    """
+    seen: set[str] = set()
+    for rating in range(1, 11):
+        page = 1
+        while True:
+            url = f"{MOVIEARCHIVE_URL}{rating}"
+            if page > 1:
+                url += f"?page={page}"
+
+            resp = _safe_get(url)
+            if resp is None:
+                break
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            links = _extract_movie_links_flexible(soup)
+
+            new_links = [l for l in links if l not in seen]
+            if not new_links:
+                logger.info("moviearchive/%d σελίδα %d: χωρίς νέες ταινίες — τέλος.", rating, page)
+                break
+
+            for link in new_links:
+                seen.add(link)
+                yield link
+
+            next_link = soup.select_one(
+                "a.pagination__next, a[rel='next'], .pager a.next, li.next a, a.next"
+            )
+            if not next_link:
+                break
+            page += 1
+        logger.info("moviearchive/%d: ολοκληρώθηκε.", rating)
 
 
 def _discover_recent() -> Generator[str, None, None]:
@@ -265,11 +330,37 @@ def scrape_movie_details(url: str) -> dict | None:
     poster_url = ""
     for img in soup.find_all("img"):
         src = img.get("src", "")
-        alt = img.get("alt", "")
-        # Η κύρια εικόνα έχει width >= 100 και src από ImagesDatabase
         if "/Content/ImagesDatabase/" in src and img.get("width") and int(img.get("width", 0)) >= 100:
             poster_url = src if src.startswith("http") else BASE_URL + src
             break
+
+    # Περιγραφή — δοκιμή γνωστών selectors του Athinorama
+    description = ""
+    for selector in [
+        ".article-description",
+        ".movie-synopsis",
+        ".synopsis",
+        ".review-intro",
+        ".article-intro",
+        ".item-description",
+        ".review-body > p:first-child",
+        "article .text > p:first-child",
+        ".page-content > p:first-child",
+    ]:
+        el = soup.select_one(selector)
+        if el:
+            txt = el.get_text(" ", strip=True)
+            if len(txt) > 30:
+                description = txt
+                break
+
+    # Fallback: πρώτη αρκετά μεγάλη παράγραφος στο κύριο περιεχόμενο
+    if not description:
+        for p in soup.select("article p, .content p, main p, .text p"):
+            txt = p.get_text(" ", strip=True)
+            if len(txt) > 80:
+                description = txt
+                break
 
     return {
         "id": movie_id,
@@ -283,6 +374,7 @@ def scrape_movie_details(url: str) -> dict | None:
         "stars": stars,
         "duration": duration,
         "poster_url": poster_url,
+        "description": description,
         "athinorama_url": url,
         "scraped_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -292,42 +384,108 @@ def scrape_movie_details(url: str) -> dict | None:
 # Κύρια συνάρτηση scraping
 # ---------------------------------------------------------------------------
 
+def _has_greek(text: str) -> bool:
+    """Ελέγχει αν ένα κείμενο περιέχει ελληνικούς χαρακτήρες."""
+    return bool(re.search(r"[Ͱ-Ͽἀ-῿]", text))
+
+
+def _yt_search(query: str) -> list[tuple[str, str]]:
+    """
+    Αναζήτηση YouTube. Επιστρέφει λίστα (video_id, title) χωρίς duplicates.
+    """
+    import urllib.parse
+    url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
+    try:
+        resp = SESSION.get(url, timeout=10)
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        logger.warning("YouTube search αποτυχία για '%s': %s", query, e)
+        return []
+
+    html = resp.text
+    # Εξαγωγή video IDs και τίτλων από ytInitialData JSON
+    ids = re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', html)
+    raw_titles = re.findall(r'"title":\{"runs":\[\{"text":"([^"]+)"', html)
+
+    seen: set[str] = set()
+    results: list[tuple[str, str]] = []
+    for i, vid in enumerate(ids):
+        if vid not in seen:
+            seen.add(vid)
+            title = raw_titles[i] if i < len(raw_titles) else ""
+            results.append((vid, title))
+    return results
+
+
 def find_youtube_trailer(title: str, original_title: str = "", year: int | None = None) -> str | None:
     """
     Ψάχνει YouTube για trailer της ταινίας.
-    Επιστρέφει το πρώτο video ID ή None.
+    Προτιμά βίντεο με ελληνικό τίτλο ή ελληνικούς υπότιτλους.
+    Επιστρέφει το πρώτο κατάλληλο video ID ή None.
     """
-    query = f"{title} trailer"
+    year_str = str(year) if year else ""
+
+    # Φάση 1: αναζήτηση με ελληνικούς όρους — επιστρέφουμε μόνο αν βρούμε ελληνικό τίτλο
+    greek_queries = [
+        f"{title} τρέιλερ {year_str}".strip(),
+        f"{title} trailer ελληνικοί υπότιτλοι {year_str}".strip(),
+        f"{title} trailer greek subtitles {year_str}".strip(),
+    ]
+    for q in greek_queries:
+        for vid_id, vid_title in _yt_search(q)[:8]:
+            if _has_greek(vid_title):
+                logger.info("Ελληνικό trailer για '%s': %s (%s)", title, vid_id, vid_title)
+                return vid_id
+
+    # Φάση 2: οποιοδήποτε αποτέλεσμα από αναζήτηση με ελληνικό τίτλο
+    results = _yt_search(f"{title} trailer {year_str}".strip())
+    if results:
+        logger.info("Trailer για '%s': %s", title, results[0][0])
+        return results[0][0]
+
+    # Fallback: πρωτότυπος τίτλος
+    if original_title and original_title != title:
+        results = _yt_search(f"{original_title} trailer {year_str}".strip())
+        if results:
+            return results[0][0]
+
+    return None
+
+
+def find_imdb_url(title: str, original_title: str = "", year: int | None = None) -> str | None:
+    """
+    Αναζητά το IMDb URL για μια ταινία μέσω του IMDb suggestion API.
+    Επιστρέφει το URL (π.χ. https://www.imdb.com/title/tt1234567/) ή None.
+    """
+    import urllib.parse
+
+    query = original_title or title
     if year:
         query += f" {year}"
 
-    import urllib.parse
-    search_url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(query)}"
+    encoded = urllib.parse.quote(query)
+    first_char = urllib.parse.quote(query[0].lower()) if query else "a"
+    url = f"https://v2.sg.media-imdb.com/suggestion/h/{first_char}/{encoded}.json"
 
     try:
-        resp = SESSION.get(search_url, timeout=10)
+        resp = SESSION.get(url, timeout=10, headers={"Accept": "application/json"})
         resp.raise_for_status()
-    except requests.RequestException as e:
-        logger.warning("YouTube search αποτυχία για '%s': %s", title, e)
-        return None
+        data = resp.json()
+        results = data.get("d", [])
 
-    # Εξαγωγή video IDs από το HTML (ytInitialData)
-    video_ids = re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', resp.text)
-    # Αφαίρεση duplicates διατηρώντας σειρά
-    seen = set()
-    unique_ids = []
-    for vid in video_ids:
-        if vid not in seen:
-            seen.add(vid)
-            unique_ids.append(vid)
-
-    if unique_ids:
-        logger.info("Βρέθηκε trailer για '%s': %s", title, unique_ids[0])
-        return unique_ids[0]
-
-    # Fallback: δοκιμή με original title
-    if original_title and original_title != title:
-        return find_youtube_trailer(original_title, year=year)
+        for item in results[:5]:
+            item_id = item.get("id", "")
+            if not item_id.startswith("tt"):
+                continue
+            item_year = item.get("y")
+            # Αποδεκτό εύρος: ±1 χρόνος
+            if year and item_year and abs(int(item_year) - int(year)) > 1:
+                continue
+            imdb_url = f"https://www.imdb.com/title/{item_id}/"
+            logger.info("Βρέθηκε IMDb για '%s': %s", title, imdb_url)
+            return imdb_url
+    except Exception as e:
+        logger.warning("IMDb search αποτυχία για '%s': %s", query, e)
 
     return None
 

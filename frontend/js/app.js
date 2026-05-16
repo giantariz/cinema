@@ -430,6 +430,24 @@ function openModal(movie, isUserEntry = false) {
   athLink.href = url;
   athLink.style.display = url ? '' : 'none';
 
+  // IMDb link
+  const imdbLink = document.getElementById('modalImdbLink');
+  imdbLink.classList.add('hidden');
+  if (movie.imdb_url) {
+    imdbLink.href = movie.imdb_url;
+    imdbLink.classList.remove('hidden');
+  } else if (movie.id) {
+    api(`/api/movies/${encodeURIComponent(movie.id)}/imdb`)
+      .then(res => {
+        if (res && res.imdb_url) {
+          imdbLink.href = res.imdb_url;
+          imdbLink.classList.remove('hidden');
+          movie.imdb_url = res.imdb_url;
+        }
+      })
+      .catch(() => {});
+  }
+
   // Trailer footer link
   const trLink = document.getElementById('modalTrailerLink');
   const trailer = movie.trailer_link || '';
