@@ -682,8 +682,13 @@ def _parse_tmdb_response(data: dict, tmdb_id: int) -> dict:
                 tmdb_trailer_key = v["key"]
                 break
 
+    release_year = int((data.get("release_date") or "0-01-01")[:4] or "0") or None
+
     return {
         "tmdb_id":              tmdb_id,
+        "title":                data.get("title") or None,
+        "original_title":       data.get("original_title") or None,
+        "year":                 release_year,
         "genre":                genres,
         "director":             directors,
         "cast":                 cast,
@@ -699,6 +704,42 @@ def _parse_tmdb_response(data: dict, tmdb_id: int) -> dict:
         "production_companies": prod_cos,
         "tmdb_trailer_key":     tmdb_trailer_key or None,
     }
+
+
+def tmdb_matches_movie(tmdb_data: dict, movie: dict) -> bool:
+    """
+    Ελέγχει αν τα TMDB δεδομένα ανήκουν στη σωστή ταινία συγκρίνοντας
+    τίτλο και έτος. Επιστρέφει False αν το match είναι προφανώς λάθος.
+    """
+    def _similarity(a: str, b: str) -> float:
+        a, b = a.lower().strip(), b.lower().strip()
+        if not a or not b:
+            return 0.0
+        if a == b:
+            return 1.0
+        longer, shorter = (a, b) if len(a) >= len(b) else (b, a)
+        return sum(c in longer for c in shorter) / len(longer)
+
+    local_title = (movie.get("title") or "").lower().strip()
+    local_original = (movie.get("title_original") or "").lower().strip()
+    local_year = movie.get("year")
+
+    tmdb_title = (tmdb_data.get("title") or "").lower().strip()
+    tmdb_original = (tmdb_data.get("original_title") or "").lower().strip()
+    tmdb_year = tmdb_data.get("year")
+
+    title_score = max(
+        _similarity(local_title, tmdb_title),
+        _similarity(local_title, tmdb_original),
+        _similarity(local_original, tmdb_title) if local_original else 0.0,
+        _similarity(local_original, tmdb_original) if local_original else 0.0,
+    )
+
+    year_diff = abs(int(local_year) - int(tmdb_year)) if local_year and tmdb_year else 0
+
+    if year_diff > 2 and title_score < 0.4:
+        return False
+    return True
 
 
 def fetch_tmdb_data_by_id(tmdb_id: int) -> dict | None:
