@@ -378,33 +378,86 @@ async function loadFiltersMeta() {
 function _updateModalFields(movie) {
   const genre    = Array.isArray(movie.genre)    ? movie.genre.join(', ')    : (movie.genre || '');
   const director = Array.isArray(movie.director) ? movie.director.join(', ') : (movie.director || '');
-  const cast     = Array.isArray(movie.cast)     ? movie.cast.join(', ')     : (movie.cast || '');
   const dur      = movie.duration ? `${formatDuration(movie.duration)} (${movie.duration} λεπτά)` : null;
 
-  // Stars: prefer Athinorama (out of 5), fall back to IMDb/2
-  const starsEl = document.getElementById('modalStars');
-  const starVal = movie.stars ? movie.stars : (movie.imdb_score ? Math.round(movie.imdb_score / 2 * 10) / 10 : null);
-  if (starVal) {
-    starsEl.innerHTML = `<span class="stars-display">${renderStars(starVal)}</span><span class="modal-stars-text">(${starVal} / 5)</span>`;
+  // Backdrop hero
+  const backdrop = document.getElementById('modalBackdrop');
+  if (movie.backdrop_path) {
+    backdrop.style.backgroundImage = `url(https://image.tmdb.org/t/p/w1280${escHtml(movie.backdrop_path)})`;
+    backdrop.classList.remove('hidden');
   } else {
-    starsEl.innerHTML = '';
+    backdrop.classList.add('hidden');
   }
 
-  const meta = [
+  // Tagline
+  document.getElementById('modalTagline').textContent = movie.tagline || '';
+
+  // Ratings row
+  const ratingsEl = document.getElementById('modalRatings');
+  let ratingsHtml = '';
+  if (movie.stars) {
+    ratingsHtml += `<div class="modal-rating-ath">
+      <span class="stars-display">${renderStars(movie.stars)}</span>
+      <span class="modal-rating-ath-text">(${movie.stars}/5 Athinorama)</span>
+    </div>`;
+  }
+  if (movie.imdb_score) {
+    if (ratingsHtml) ratingsHtml += '<div class="modal-rating-divider"></div>';
+    const votes = movie.vote_count ? ` · ${(movie.vote_count / 1000).toFixed(0)}K ψήφοι` : '';
+    ratingsHtml += `<div class="modal-rating-tmdb">
+      <span class="modal-rating-tmdb-score">${movie.imdb_score}</span>
+      <span class="modal-rating-tmdb-max">/10</span>
+      <span class="modal-rating-tmdb-label">TMDB${votes}</span>
+    </div>`;
+  }
+  ratingsEl.innerHTML = ratingsHtml;
+
+  // Cast: prefer cast_roles (with characters), fall back to plain cast
+  let castHtml = '';
+  if (Array.isArray(movie.cast_roles) && movie.cast_roles.length) {
+    castHtml = `<div class="cast-roles-list">${movie.cast_roles.map(r => {
+      const char = r.character ? ` <span class="cast-role-char">ως ${escHtml(r.character)}</span>` : '';
+      return `<div class="cast-role-item"><span class="cast-role-name">${escHtml(r.name)}</span>${char}</div>`;
+    }).join('')}</div>`;
+  } else if (Array.isArray(movie.cast) && movie.cast.length) {
+    castHtml = escHtml(movie.cast.join(', '));
+  } else if (typeof movie.cast === 'string' && movie.cast) {
+    castHtml = escHtml(movie.cast);
+  }
+
+  // Production companies
+  const prodCos = Array.isArray(movie.production_companies) && movie.production_companies.length
+    ? movie.production_companies.join(', ') : '';
+
+  // Language label
+  const langMap = { en: 'Αγγλικά', el: 'Ελληνικά', fr: 'Γαλλικά', de: 'Γερμανικά', es: 'Ισπανικά',
+    it: 'Ιταλικά', pt: 'Πορτογαλικά', ru: 'Ρωσικά', ja: 'Ιαπωνικά', ko: 'Κορεατικά',
+    zh: 'Κινεζικά', ar: 'Αραβικά', hi: 'Χίντι', tr: 'Τουρκικά', pl: 'Πολωνικά' };
+  const lang = movie.original_language ? (langMap[movie.original_language] || movie.original_language.toUpperCase()) : '';
+
+  const simpleMeta = [
     ['Έτος',       movie.year],
     ['Χώρα',       movie.country],
+    ['Γλώσσα',     lang],
     ['Είδος',      genre],
     ['Σκηνοθεσία', director],
     ['Διάρκεια',   dur],
-    ['Ηθοποιοί',   cast],
+    ['Παραγωγή',   prodCos],
   ].filter(([, v]) => v);
 
-  document.getElementById('modalMeta').innerHTML = meta.map(([l, v]) => `
+  const metaRows = simpleMeta.map(([l, v]) => `
     <div class="modal-meta-row">
       <span class="modal-meta-label">${escHtml(l)}</span>
       <span class="modal-meta-value">${escHtml(String(v))}</span>
     </div>`).join('');
 
+  const castRow = castHtml ? `
+    <div class="modal-meta-row">
+      <span class="modal-meta-label">Ηθοποιοί</span>
+      <span class="modal-meta-value">${castHtml}</span>
+    </div>` : '';
+
+  document.getElementById('modalMeta').innerHTML = metaRows + castRow;
   document.getElementById('modalScores').innerHTML = '';
 
   // IMDb link
@@ -429,9 +482,12 @@ function openModal(movie, isUserEntry = false) {
 
   document.getElementById('modalTitle').textContent = movie.title || '—';
   document.getElementById('modalOriginal').textContent = movie.title_original || '';
+  document.getElementById('modalTagline').textContent = '';
 
-  // Stars (Athinorama) — κρυμμένα
-  document.getElementById('modalStars').innerHTML = '';
+  // Reset backdrop
+  const backdrop = document.getElementById('modalBackdrop');
+  backdrop.classList.add('hidden');
+  backdrop.style.backgroundImage = '';
 
   // Κρύψε IMDb link μέχρι να επιβεβαιωθεί URL
   document.getElementById('modalImdbLink').classList.add('hidden');
@@ -481,7 +537,7 @@ function openModal(movie, isUserEntry = false) {
   trLink.href = trailer;
   trLink.classList.toggle('hidden', !trailer);
 
-  // Trailer embed
+  // Trailer embed — προτιμάμε TMDB trailer key, αλλιώς YouTube search
   const trailerSec  = document.getElementById('modalTrailerSection');
   const trailerWrap = document.getElementById('modalTrailerWrap');
   const trailerLoad = document.getElementById('modalTrailerLoading');
@@ -489,8 +545,9 @@ function openModal(movie, isUserEntry = false) {
   trailerLoad.style.display = 'flex';
   trailerWrap.querySelectorAll('iframe').forEach(f => f.remove());
 
-  if (movie.yt_trailer_id) {
-    _embedTrailer(movie.yt_trailer_id);
+  const knownTrailerId = movie.yt_trailer_id || movie.tmdb_trailer_key;
+  if (knownTrailerId) {
+    _embedTrailer(knownTrailerId);
   } else {
     api(`/api/movies/${encodeURIComponent(movie.id)}/trailer`)
       .then(res => {

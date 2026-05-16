@@ -607,7 +607,7 @@ def find_tmdb_data(title: str, original_title: str = "", year: int | None = None
     try:
         r = requests.get(
             f"{TMDB_BASE}/movie/{tmdb_id}",
-            params={"api_key": TMDB_API_KEY, "append_to_response": "credits", "language": "el"},
+            params={"api_key": TMDB_API_KEY, "append_to_response": "credits,videos", "language": "el"},
             timeout=10,
         )
         r.raise_for_status()
@@ -619,22 +619,49 @@ def find_tmdb_data(title: str, original_title: str = "", year: int | None = None
     genres    = [g["name"] for g in data.get("genres", [])]
     credits   = data.get("credits", {})
     directors = [c["name"] for c in credits.get("crew", []) if c.get("job") == "Director"]
-    cast      = [c["name"] for c in credits.get("cast", [])[:10]]
+    cast_raw  = credits.get("cast", [])[:10]
+    cast      = [c["name"] for c in cast_raw]
+    cast_roles = [{"name": c["name"], "character": c.get("character", "")} for c in cast_raw]
     overview  = data.get("overview", "")
     vote_avg  = data.get("vote_average")
+    vote_count = data.get("vote_count")
     imdb_id   = data.get("imdb_id")
     imdb_url  = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else None
+    tagline   = data.get("tagline") or None
+    backdrop  = data.get("backdrop_path") or None
+    orig_lang = data.get("original_language") or None
+    prod_cos  = [c["name"] for c in data.get("production_companies", [])[:3]] or None
+
+    # Trailer από TMDB videos (προτιμάμε Official Trailer, αλλιώς πρώτο Trailer)
+    tmdb_trailer_key = None
+    videos = data.get("videos", {}).get("results", [])
+    for v in videos:
+        if v.get("site") == "YouTube" and v.get("type") == "Trailer" and v.get("official"):
+            tmdb_trailer_key = v["key"]
+            break
+    if not tmdb_trailer_key:
+        for v in videos:
+            if v.get("site") == "YouTube" and v.get("type") == "Trailer":
+                tmdb_trailer_key = v["key"]
+                break
 
     logger.info("TMDB εμπλουτισμός για '%s' (tmdb_id=%s)", title, tmdb_id)
     return {
-        "tmdb_id":    tmdb_id,
-        "genre":      genres,
-        "director":   directors,
-        "cast":       cast,
-        "description": overview or None,
-        "imdb_score": round(float(vote_avg), 1) if vote_avg else None,
-        "imdb_url":   imdb_url,
-        "imdb_id":    imdb_id,
+        "tmdb_id":              tmdb_id,
+        "genre":                genres,
+        "director":             directors,
+        "cast":                 cast,
+        "cast_roles":           cast_roles,
+        "description":          overview or None,
+        "imdb_score":           round(float(vote_avg), 1) if vote_avg else None,
+        "vote_count":           vote_count or None,
+        "imdb_url":             imdb_url,
+        "imdb_id":              imdb_id,
+        "tagline":              tagline,
+        "backdrop_path":        backdrop,
+        "original_language":    orig_lang,
+        "production_companies": prod_cos,
+        "tmdb_trailer_key":     tmdb_trailer_key or None,
     }
 
 

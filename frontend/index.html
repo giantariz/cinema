@@ -197,11 +197,15 @@
 <div class="modal-overlay hidden" id="movieModal">
   <div class="modal" role="dialog" aria-modal="true">
 
+    <!-- Backdrop hero image -->
+    <div class="modal-backdrop-hero hidden" id="modalBackdrop"></div>
+
     <!-- Top bar: title + close -->
     <div class="modal-topbar">
       <div class="modal-topbar-titles">
         <div class="modal-title"    id="modalTitle"></div>
         <div class="modal-original" id="modalOriginal"></div>
+        <div class="modal-tagline"  id="modalTagline"></div>
       </div>
       <button class="modal-topbar-close" id="modalTopbarClose" aria-label="Κλείσιμο">✕</button>
     </div>
@@ -210,9 +214,9 @@
     <div class="modal-main">
       <div class="modal-poster" id="modalPoster"></div>
       <div class="modal-info">
-        <div class="modal-stars"  id="modalStars"></div>
-        <div class="modal-meta"   id="modalMeta"></div>
-        <div class="modal-scores" id="modalScores"></div>
+        <div class="modal-ratings"  id="modalRatings"></div>
+        <div class="modal-meta"     id="modalMeta"></div>
+        <div class="modal-scores"   id="modalScores"></div>
         <div id="modalListBadge"></div>
       </div>
     </div>
