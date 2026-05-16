@@ -166,6 +166,14 @@ def get_random_movie() -> dict | None:
     return {"id": doc.id, **doc.to_dict()}
 
 
+def save_movie_trailer(movie_id: str, video_id: str) -> None:
+    """Αποθηκεύει το YouTube trailer video ID σε υπάρχον movie doc."""
+    db = _get_db()
+    db.collection("movies").document(str(movie_id)).set(
+        {"yt_trailer_id": video_id}, merge=True
+    )
+
+
 def get_distinct_countries() -> list[str]:
     """Επιστρέφει λίστα χωρών για dropdown."""
     db = _get_db()

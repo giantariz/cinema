@@ -588,6 +588,54 @@
     .score-badge .score-label { font-size: 0.68rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em; }
     .score-badge .score-val   { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
 
+    .modal-trailer {
+      padding: 0 24px 20px;
+    }
+    .modal-trailer-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+    .modal-trailer-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .modal-trailer-wrap iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    .modal-trailer-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text2);
+      font-size: 0.85rem;
+      gap: 8px;
+    }
+    .modal-trailer-loading::before {
+      content: '';
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     .modal-footer {
       padding: 16px 24px;
       border-top: 1px solid var(--border);
@@ -1065,6 +1113,12 @@
         <div class="modal-section-content" id="modalSimilar"></div>
       </div>
     </div>
+    <div class="modal-trailer" id="modalTrailerSection" style="display:none;">
+      <div class="modal-trailer-title">Trailer</div>
+      <div class="modal-trailer-wrap" id="modalTrailerWrap">
+        <div class="modal-trailer-loading" id="modalTrailerLoading">Φόρτωση trailer…</div>
+      </div>
+    </div>
     <div class="modal-footer">
       <div class="dropdown-wrap">
         <button class="btn-primary" id="addToListBtn">+ Προσθήκη στη λίστα μου</button>
@@ -1510,17 +1564,57 @@ function openModal(movie, isUserEntry = false) {
   athLink.href = url;
   athLink.style.display = url ? '' : 'none';
 
-  // Trailer link
+  // Trailer link (footer button — keep as fallback)
   const trLink = document.getElementById('modalTrailerLink');
   const trailer = movie.trailer_link || '';
   trLink.href = trailer;
   trLink.classList.toggle('hidden', !trailer);
 
+  // Trailer embed section
+  const trailerSec  = document.getElementById('modalTrailerSection');
+  const trailerWrap = document.getElementById('modalTrailerWrap');
+  const trailerLoad = document.getElementById('modalTrailerLoading');
+  // Reset: show loading state
+  trailerSec.style.display = '';
+  trailerLoad.style.display = 'flex';
+  trailerWrap.querySelectorAll('iframe').forEach(f => f.remove());
+
+  // Load trailer async — use cached yt_trailer_id if available
+  const movieId = movie.id;
+  if (movie.yt_trailer_id) {
+    _embedTrailer(movie.yt_trailer_id);
+  } else {
+    api(`/api/movies/${encodeURIComponent(movieId)}/trailer`)
+      .then(res => {
+        if (res && res.video_id) {
+          _embedTrailer(res.video_id);
+        } else {
+          trailerSec.style.display = 'none';
+        }
+      })
+      .catch(() => { trailerSec.style.display = 'none'; });
+  }
+
   document.getElementById('movieModal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
 
+function _embedTrailer(videoId) {
+  const trailerSec  = document.getElementById('modalTrailerSection');
+  const trailerWrap = document.getElementById('modalTrailerWrap');
+  const trailerLoad = document.getElementById('modalTrailerLoading');
+  trailerLoad.style.display = 'none';
+  trailerSec.style.display = '';
+  const iframe = document.createElement('iframe');
+  iframe.src = `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`;
+  iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+  iframe.allowFullscreen = true;
+  trailerWrap.appendChild(iframe);
+}
+
 function closeModal() {
+  // Stop video playback by removing the iframe
+  document.getElementById('modalTrailerWrap').querySelectorAll('iframe').forEach(f => f.remove());
   document.getElementById('movieModal').classList.add('hidden');
   document.body.style.overflow = '';
 }

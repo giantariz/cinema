@@ -154,6 +154,40 @@ def filters_meta():
 
 
 # ---------------------------------------------------------------------------
+# Trailer endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/api/movies/<movie_id>/trailer")
+def get_movie_trailer(movie_id: str):
+    """Επιστρέφει YouTube video ID για το trailer της ταινίας."""
+    try:
+        movie = db.get_movie(movie_id)
+        if not movie:
+            return jsonify({"error": "Η ταινία δεν βρέθηκε"}), 404
+
+        # Cached trailer
+        if movie.get("yt_trailer_id"):
+            return jsonify({"video_id": movie["yt_trailer_id"]}), 200
+
+        # Αναζήτηση YouTube
+        video_id = scraper.find_youtube_trailer(
+            title=movie.get("title", ""),
+            original_title=movie.get("title_original", ""),
+            year=movie.get("year"),
+        )
+
+        if video_id:
+            db.save_movie_trailer(movie_id, video_id)
+            return jsonify({"video_id": video_id}), 200
+
+        return jsonify({"video_id": None}), 200
+
+    except Exception as e:
+        logger.error("Σφάλμα get_movie_trailer %s: %s", movie_id, e)
+        return jsonify({"error": "Εσωτερικό σφάλμα"}), 500
+
+
+# ---------------------------------------------------------------------------
 # Scraping endpoints
 # ---------------------------------------------------------------------------
 
