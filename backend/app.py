@@ -230,7 +230,7 @@ _ENRICH_FIELDS = (
     "tmdb_trailer_key",
 )
 # Πεδία που θεωρούνται "νέα" — αν λείπουν από ταινίες με tmdb_id, κάνουμε re-fetch
-_NEW_FIELDS = ("backdrop_path", "cast_roles", "tagline", "vote_count", "production_companies", "original_language")
+_NEW_FIELDS = ("backdrop_path", "cast_roles", "tagline", "vote_count", "production_companies", "original_language", "imdb_score", "imdb_url")
 
 
 @app.get("/api/movies/<movie_id>/enrich")
