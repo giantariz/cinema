@@ -196,8 +196,8 @@ async function loadMovies() {
   if (f.q)        params.set('q', f.q);
   if (f.yearFrom) params.set('year_from', f.yearFrom);
   if (f.yearTo)   params.set('year_to', f.yearTo);
-  if (f.starsMin) params.set('stars_min', f.starsMin);
-  if (f.starsMax) params.set('stars_max', f.starsMax);
+  if (f.imdbMin) params.set('imdb_min', f.imdbMin);
+  if (f.imdbMax) params.set('imdb_max', f.imdbMax);
   if (f.country)  params.set('country', f.country);
   if (f.genre)    params.set('genre', f.genre);
   if (f.durMin)   params.set('duration_min', f.durMin);
@@ -363,13 +363,8 @@ function openModal(movie, isUserEntry = false) {
   document.getElementById('modalTitle').textContent = movie.title || '—';
   document.getElementById('modalOriginal').textContent = movie.title_original || '';
 
-  // Stars
-  const starsEl = document.getElementById('modalStars');
-  if (movie.stars) {
-    starsEl.innerHTML = `<span class="stars-display">${renderStars(movie.stars)}</span><span class="modal-stars-text">(${movie.stars} / 5)</span>`;
-  } else {
-    starsEl.innerHTML = '';
-  }
+  // Stars (Athinorama) — κρυμμένα
+  document.getElementById('modalStars').innerHTML = '';
 
   // Poster
   const pWrap = document.getElementById('modalPoster');
@@ -401,11 +396,9 @@ function openModal(movie, isUserEntry = false) {
       <span class="modal-meta-value">${escHtml(String(v))}</span>
     </div>`).join('');
 
-  // Scores
+  // Scores — μόνο IMDb
   const scores = [];
-  if (movie.imdb_score)      scores.push(['IMDb', movie.imdb_score]);
-  if (movie.tmdb_score)      scores.push(['TMDB', movie.tmdb_score]);
-  if (movie.rotten_tomatoes) scores.push(['RT',   movie.rotten_tomatoes]);
+  if (movie.imdb_score) scores.push(['IMDb', movie.imdb_score]);
   document.getElementById('modalScores').innerHTML = scores.map(([l, v]) =>
     `<div class="score-badge"><div class="score-label">${escHtml(l)}</div><div class="score-val">${escHtml(String(v))}</div></div>`
   ).join('');
@@ -746,8 +739,8 @@ function addFilterListener(id, key) {
 }
 addFilterListener('yearFrom',     'yearFrom');
 addFilterListener('yearTo',       'yearTo');
-addFilterListener('starsMin',     'starsMin');
-addFilterListener('starsMax',     'starsMax');
+addFilterListener('imdbMin',      'imdbMin');
+addFilterListener('imdbMax',      'imdbMax');
 addFilterListener('countrySelect','country');
 addFilterListener('genreSelect',  'genre');
 addFilterListener('durMin',       'durMin');
@@ -783,7 +776,7 @@ document.getElementById('randomBtn').addEventListener('click', loadRandom);
 document.getElementById('clearFiltersBtn').addEventListener('click', () => {
   state.filters = {};
   state.page = 1;
-  ['searchInput','yearFrom','yearTo','starsMin','starsMax','durMin','durMax'].forEach(id => {
+  ['searchInput','yearFrom','yearTo','imdbMin','imdbMax','durMin','durMax'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });

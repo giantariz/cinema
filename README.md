@@ -6,7 +6,7 @@ Searchable movie database populated by scraping the [Athinorama](https://www.ath
 
 ## Features
 
-- **Αρχείο ταινιών** — φίλτρα (έτος, αστεράκια, χώρα, είδος, διάρκεια), ταξινόμηση, pagination
+- **Αρχείο ταινιών** — φίλτρα (έτος, βαθμολογία IMDb, χώρα, είδος, διάρκεια), ταξινόμηση, pagination
 - **Τυχαία ταινία** — "Τυχαία" κουμπί για discovery
 - **Η Λίστα μου** — personal watchlist με 4 κατηγορίες (ταινίες/σειρές, είδα/αγαπημένα)
 - **Google Sheets Sync** — Apps Script για sync από spreadsheet → Firestore
@@ -201,8 +201,8 @@ Health check.
 | `q` | string | Fulltext αναζήτηση τίτλου |
 | `year_from` | int | Έτος από |
 | `year_to` | int | Έτος έως |
-| `stars_min` | float | Αστεράκια από (1–5) |
-| `stars_max` | float | Αστεράκια έως |
+| `imdb_min` | float | Βαθμολογία IMDb από (1–10) |
+| `imdb_max` | float | Βαθμολογία IMDb έως |
 | `country` | string | Χώρα παραγωγής |
 | `genre` | string | Είδος ταινίας |
 | `duration_min` | int | Διάρκεια από (λεπτά) |
@@ -297,3 +297,13 @@ Sync από Google Sheets. Requires `Authorization: Bearer <SYNC_API_KEY>`.
 | Apps Script | Copy-paste στο Google Spreadsheet + ρύθμιση BACKEND_URL/SYNC_API_KEY |
 | Firestore indexes | `firebase deploy --only firestore:indexes` |
 | Πρώτο scraping | Από το admin panel (⚙) → mode: full → Έναρξη |
+
+---
+
+## Changelog
+
+### v1.1 — Modal & Filter Updates
+- **Pop-up modal**: εμφανίζει βαθμολογία IMDb, Έτος, Χώρα, Είδος, Σκηνοθεσία, Διάρκεια, Ηθοποιοί, Περιγραφή
+- **Αθηνόραμα βαθμολογία** αφαιρέθηκε από το pop-up και το φίλτρο
+- **Φίλτρο βαθμολογίας**: μετονομάστηκε σε "Βαθμολογία IMDb" (κλίμακα 1–10), φιλτράρει βάσει `imdb_score`
+- **Κουμπί IMDb**: εμφανίζεται με κίτρινο χρώμα (#f5c518) στο modal footer
