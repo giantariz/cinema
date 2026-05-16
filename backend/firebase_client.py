@@ -188,6 +188,22 @@ def save_movie_tmdb_data(movie_id: str, data: dict) -> None:
     db.collection("movies").document(str(movie_id)).set(data, merge=True)
 
 
+def clear_movies_collection() -> int:
+    """Διαγράφει όλα τα docs από τη collection movies. Επιστρέφει πόσα διαγράφηκαν."""
+    db = _get_db()
+    deleted = 0
+    while True:
+        docs = list(db.collection("movies").limit(500).stream())
+        if not docs:
+            break
+        batch = db.batch()
+        for doc in docs:
+            batch.delete(doc.reference)
+        batch.commit()
+        deleted += len(docs)
+    return deleted
+
+
 def get_distinct_countries() -> list[str]:
     """Επιστρέφει λίστα χωρών για dropdown."""
     db = _get_db()

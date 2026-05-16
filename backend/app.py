@@ -290,6 +290,23 @@ def scrape_start():
     return jsonify({"scrape_id": scrape_id, "status": "started", "mode": mode}), 202
 
 
+@app.post("/api/scrape/test")
+@require_scrape_key
+def scrape_test():
+    """Test scraping: σβήνει τη βάση movies και φέρνει 25 ταινίες."""
+    scrape_id = str(uuid.uuid4())
+    db.create_scrape_job(scrape_id, "test")
+
+    t = threading.Thread(
+        target=scraper.run_test_scrape,
+        args=(scrape_id,),
+        daemon=True,
+    )
+    t.start()
+
+    return jsonify({"scrape_id": scrape_id, "status": "started", "mode": "test"}), 202
+
+
 @app.get("/api/scrape/status")
 def scrape_status():
     """Progress ενός ή του πιο πρόσφατου scrape job."""

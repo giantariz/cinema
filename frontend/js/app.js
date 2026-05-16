@@ -681,6 +681,23 @@ document.getElementById('startScrapeBtn').addEventListener('click', async () => 
 
 document.getElementById('refreshStatusBtn').addEventListener('click', refreshScrapeStatus);
 
+document.getElementById('testScrapeBtn').addEventListener('click', async () => {
+  const key = document.getElementById('scrapeKey').value.trim();
+  if (!confirm('⚠ Θα διαγραφεί ΟΛΟΚΛΗΡΗ η βάση ταινιών και θα φερθούν 25 ταινίες για testing.\n\nΣυνέχεια;')) return;
+  setAdminStatus('Εκκίνηση test scraping — διαγραφή βάσης…', 'info');
+  try {
+    const res = await api('/api/scrape/test', {
+      method: 'POST',
+      body: JSON.stringify({ api_key: key }),
+    });
+    state.scrapeId = res.scrape_id;
+    toast('Test scraping ξεκίνησε! Διαγραφή βάσης + 25 ταινίες…', 'success');
+    startScrapePolling();
+  } catch (e) {
+    setAdminStatus('Σφάλμα: ' + e.message, 'error');
+  }
+});
+
 async function refreshScrapeStatus() {
   try {
     const qs  = state.scrapeId ? `?scrape_id=${state.scrapeId}` : '';
