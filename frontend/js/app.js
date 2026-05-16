@@ -363,6 +363,15 @@ function _updateModalFields(movie) {
   const cast     = Array.isArray(movie.cast)     ? movie.cast.join(', ')     : (movie.cast || '');
   const dur      = movie.duration ? `${formatDuration(movie.duration)} (${movie.duration} λεπτά)` : null;
 
+  // Stars: prefer Athinorama (out of 5), fall back to IMDb/2
+  const starsEl = document.getElementById('modalStars');
+  const starVal = movie.stars ? movie.stars : (movie.imdb_score ? Math.round(movie.imdb_score / 2 * 10) / 10 : null);
+  if (starVal) {
+    starsEl.innerHTML = `<span class="stars-display">${renderStars(starVal)}</span><span class="modal-stars-text">(${starVal} / 5)</span>`;
+  } else {
+    starsEl.innerHTML = '';
+  }
+
   const meta = [
     ['Έτος',       movie.year],
     ['Χώρα',       movie.country],
@@ -378,12 +387,7 @@ function _updateModalFields(movie) {
       <span class="modal-meta-value">${escHtml(String(v))}</span>
     </div>`).join('');
 
-  // IMDb score badge
-  const scores = [];
-  if (movie.imdb_score) scores.push(['IMDb', movie.imdb_score]);
-  document.getElementById('modalScores').innerHTML = scores.map(([l, v]) =>
-    `<div class="score-badge"><div class="score-label">${escHtml(l)}</div><div class="score-val">${escHtml(String(v))}</div></div>`
-  ).join('');
+  document.getElementById('modalScores').innerHTML = '';
 
   // IMDb link
   const imdbLink = document.getElementById('modalImdbLink');
