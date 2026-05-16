@@ -80,6 +80,24 @@ function renderStars(stars) {
   return '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(empty);
 }
 
+function cleanDescription(desc) {
+  if (!desc) return '';
+  // Strip Athinorama metadata prefix: "[title] [orig] [stars] [genre] [year] Διάρκεια: N΄ [Director] [synopsis]"
+  const match = desc.match(/^[\s\S]{0,300}?Διάρκεια:\s*\d+\s*[΄΄'']\s*/);
+  if (!match) return desc;
+  let rest = desc.slice(match[0].length).trim();
+  // Skip any trailing capitalized proper-noun words (director name) before the synopsis
+  const articles = new Set(['Μια', 'Μία', 'Ένας', 'Ένα', 'Ο', 'Η', 'Το', 'Οι', 'Τα', 'Στην', 'Στον', 'Στο', 'Με', 'Όταν', 'Ένας']);
+  const words = rest.split(/\s+/);
+  let skip = 0;
+  for (let i = 0; i < Math.min(5, words.length); i++) {
+    if (articles.has(words[i])) break;
+    if (/^[Α-ΩΆΈΉΊΌΎΏA-Z]/.test(words[i])) skip = i + 1;
+    else break;
+  }
+  return words.slice(skip).join(' ').trim() || rest;
+}
+
 function formatDuration(minutes) {
   if (!minutes) return null;
   const mins = parseInt(minutes);
@@ -397,7 +415,7 @@ function _updateModalFields(movie) {
   }
 
   // Description
-  const desc = movie.description || '';
+  const desc = cleanDescription(movie.description || '');
   const descSec = document.getElementById('modalDescSection');
   document.getElementById('modalDesc').textContent = desc;
   descSec.style.display = desc ? '' : 'none';
