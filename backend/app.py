@@ -249,9 +249,21 @@ def enrich_movie(movie_id: str):
             return jsonify(movie), 200
 
         # Αν έχει tmdb_id αλλά λείπουν νέα πεδία → fetch απευθείας με ID (χωρίς search)
+        # Επαλήθευση ότι το αποθηκευμένο tmdb_id ανήκει όντως στη σωστή ταινία.
         if existing_tmdb_id:
             tmdb_data = scraper.fetch_tmdb_data_by_id(existing_tmdb_id)
-        else:
+            if tmdb_data and not scraper.tmdb_matches_movie(tmdb_data, movie):
+                logger.warning(
+                    "tmdb_id=%s δεν ταιριάζει με '%s' (%s) — αγνοείται, νέα αναζήτηση",
+                    existing_tmdb_id, movie.get("title"), movie.get("year"),
+                )
+                # Καθαρισμός λανθασμένου tmdb_id από τη βάση
+                db.save_movie_tmdb_data(movie_id, {"tmdb_id": None})
+                movie["tmdb_id"] = None
+                existing_tmdb_id = None
+                tmdb_data = None
+
+        if not existing_tmdb_id:
             tmdb_data = scraper.find_tmdb_data(
                 title=movie.get("title", ""),
                 original_title=movie.get("title_original", ""),
