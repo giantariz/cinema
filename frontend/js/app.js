@@ -513,8 +513,8 @@ function openModal(movie, isUserEntry = false) {
   // TMDB enrichment — καλείται αν: δεν υπάρχει tmdb_id ΚΑΙ λείπουν βασικά πεδία,
   // ή υπάρχει tmdb_id αλλά λείπουν τα νέα πεδία (backdrop, tagline, cast_roles)
   const missingBasic = !movie.genre?.length || !movie.director?.length || !movie.cast?.length || !movie.imdb_score;
-  const missingNew   = !movie.backdrop_path && !movie.tagline && !movie.cast_roles?.length;
-  const needsEnrich  = movie.id && ((!movie.tmdb_id && missingBasic) || missingNew);
+  const missingNew   = (!movie.backdrop_path && !movie.tagline && !movie.cast_roles?.length) || !movie.imdb_score;
+  const needsEnrich  = movie.id && ((!movie.tmdb_id && missingBasic) || (movie.tmdb_id && missingNew));
   if (needsEnrich) {
     api(`/api/movies/${encodeURIComponent(movie.id)}/enrich`)
       .then(enriched => {
