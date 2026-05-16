@@ -564,6 +564,97 @@ select option { background: var(--bg3); }
 /* ============================
    Modal
 ============================ */
+
+/* Backdrop hero */
+.modal-backdrop-hero {
+  width: 100%;
+  height: 190px;
+  background-size: cover;
+  background-position: center 30%;
+  position: relative;
+  flex-shrink: 0;
+  border-radius: 12px 12px 0 0;
+  overflow: hidden;
+}
+.modal-backdrop-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(8,8,18,0.25) 0%, rgba(8,8,18,0.92) 100%);
+}
+.modal-backdrop-hero.hidden { display: none; }
+
+/* Tagline */
+.modal-tagline {
+  font-size: 0.78rem;
+  color: var(--accent);
+  font-style: italic;
+  margin-top: 5px;
+  opacity: 0.9;
+  line-height: 1.4;
+}
+.modal-tagline:empty { display: none; }
+
+/* Ratings row (Athinorama + TMDB) */
+.modal-ratings {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.modal-rating-ath {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.modal-rating-ath .stars-display { font-size: 1.05rem; }
+.modal-rating-ath-text { font-size: 0.8rem; color: var(--text2); }
+.modal-rating-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.modal-rating-tmdb {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.modal-rating-tmdb-score {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+.modal-rating-tmdb-max {
+  font-size: 0.78rem;
+  color: var(--text2);
+}
+.modal-rating-tmdb-label {
+  font-size: 0.68rem;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-left: 3px;
+}
+.modal-rating-tmdb-votes {
+  font-size: 0.72rem;
+  color: var(--text2);
+  margin-left: 2px;
+}
+
+/* Cast with character roles */
+.cast-roles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cast-role-item {
+  font-size: 0.82rem;
+}
+.cast-role-name { color: var(--text); font-weight: 500; }
+.cast-role-char { color: var(--text2); font-weight: 400; }
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -684,6 +775,9 @@ select option { background: var(--bg3); }
 }
 .modal-stars .stars-display { font-size: 1.05rem; }
 .modal-stars-text { font-size: 0.85rem; color: var(--text2); }
+
+/* Legacy alias used by some paths */
+#modalStars { display: none; }
 
 .modal-meta { width: 100%; }
 

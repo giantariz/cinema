@@ -246,7 +246,12 @@ def enrich_movie(movie_id: str):
 
         # Ενημέρωσε μόνο κενά πεδία (μη αντικατάσταση υπαρχόντων)
         update = {"tmdb_id": tmdb_data["tmdb_id"]}
-        for field in ("genre", "director", "cast", "description", "imdb_score", "imdb_url", "imdb_id"):
+        for field in (
+            "genre", "director", "cast", "cast_roles", "description",
+            "imdb_score", "vote_count", "imdb_url", "imdb_id",
+            "tagline", "backdrop_path", "original_language", "production_companies",
+            "tmdb_trailer_key",
+        ):
             if tmdb_data.get(field) and not movie.get(field):
                 update[field] = tmdb_data[field]
 
