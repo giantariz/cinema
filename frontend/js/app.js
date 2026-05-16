@@ -517,13 +517,18 @@ function openModal(movie, isUserEntry = false) {
   const missingNew   = !movie.original_language;
   const needsEnrich  = movie.id && ((!movie.tmdb_id && missingBasic) || (movie.tmdb_id && missingNew));
   if (needsEnrich) {
+    console.log('[TMDB] enriching:', movie.id, movie.title, '| tmdb_id:', movie.tmdb_id, '| lang:', movie.original_language);
     api(`/api/movies/${encodeURIComponent(movie.id)}/enrich`)
       .then(enriched => {
-        if (!enriched || enriched.enriched === false) return;
+        console.log('[TMDB] response → enriched:', enriched?.enriched, '| tmdb_id:', enriched?.tmdb_id, '| lang:', enriched?.original_language, '| score:', enriched?.imdb_score, '| cast:', enriched?.cast_roles?.length);
+        if (!enriched || enriched.enriched === false) {
+          console.warn('[TMDB] skipped (enriched=false or null). TMDB_API_KEY set?');
+          return;
+        }
         Object.assign(movie, enriched);
         _updateModalFields(movie);
       })
-      .catch(() => {});
+      .catch((err) => console.error('[TMDB] enrich error:', err));
   }
 
   // Trailer footer link
