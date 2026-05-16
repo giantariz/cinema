@@ -1,0 +1,1847 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Αθηνόραμα Αρχείο Ταινιών</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ============================
+       CSS Reset & Variables
+    ============================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0f;
+      --bg2:       #12121a;
+      --bg3:       #1a1a26;
+      --bg4:       #222233;
+      --border:    #2a2a40;
+      --accent:    #e8b84b;
+      --accent2:   #c49a35;
+      --text:      #e8e8f0;
+      --text2:     #9999bb;
+      --text3:     #6666888;
+      --danger:    #e85555;
+      --success:   #55cc88;
+      --card-w:    200px;
+      --radius:    8px;
+      --shadow:    0 4px 24px rgba(0,0,0,0.5);
+      --transition: 0.18s ease;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent2); }
+
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      outline: none;
+      transition: var(--transition);
+    }
+
+    input, select {
+      font-family: inherit;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      transition: var(--transition);
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    select option { background: var(--bg3); }
+
+    /* ============================
+       Header
+    ============================ */
+    .header {
+      background: linear-gradient(180deg, #0e0e18 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      height: 64px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      color: var(--accent);
+    }
+
+    .logo-text {
+      font-family: 'Cinzel', serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      line-height: 1.2;
+    }
+
+    .logo-sub {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.65rem;
+      color: var(--text2);
+      font-weight: 400;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .nav-tab {
+      background: none;
+      color: var(--text2);
+      padding: 8px 18px;
+      border-radius: var(--radius);
+      font-size: 0.9rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+    .nav-tab:hover { color: var(--text); background: var(--bg3); }
+    .nav-tab.active { color: var(--accent); background: var(--bg3); }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-left: auto;
+    }
+
+    .btn-icon {
+      background: var(--bg3);
+      color: var(--text2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+    .btn-icon:hover { color: var(--text); border-color: var(--accent); }
+
+    /* ============================
+       Main layout
+    ============================ */
+    .main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* ============================
+       Filters panel
+    ============================ */
+    .filters-panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      display: grid;
+      grid-template-columns: 1fr repeat(2, 160px) 160px 160px 160px;
+      gap: 12px;
+      align-items: end;
+    }
+
+    @media (max-width: 1100px) {
+      .filters-panel { grid-template-columns: 1fr 1fr 1fr; }
+    }
+    @media (max-width: 700px) {
+      .filters-panel { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 480px) {
+      .filters-panel { grid-template-columns: 1fr; }
+    }
+
+    .filter-group { display: flex; flex-direction: column; gap: 4px; }
+    .filter-label {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .filter-range {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .filter-range input { font-size: 0.85rem; }
+
+    .search-wrap { position: relative; }
+    .search-wrap input {
+      width: 100%;
+      padding-left: 36px;
+      font-size: 0.95rem;
+    }
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text2);
+      font-size: 0.95rem;
+      pointer-events: none;
+    }
+
+    select { width: 100%; font-size: 0.85rem; }
+
+    /* ============================
+       Toolbar
+    ============================ */
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px 10px;
+    }
+
+    .toolbar-label {
+      font-size: 0.72rem;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+
+    .toolbar-select {
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 0.85rem;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    .toolbar-btn {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 8px 14px;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .toolbar-btn:hover { color: var(--text); border-color: var(--accent); }
+    .toolbar-btn.accent {
+      background: var(--accent);
+      color: #0a0a0f;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .toolbar-btn.accent:hover { background: var(--accent2); border-color: var(--accent2); }
+
+    .sort-dir-btn {
+      background: none;
+      border: none;
+      color: var(--text2);
+      font-size: 1.1rem;
+      padding: 2px 4px;
+    }
+    .sort-dir-btn:hover { color: var(--accent); }
+
+    .results-count {
+      margin-left: auto;
+      font-size: 0.82rem;
+      color: var(--text2);
+    }
+
+    /* ============================
+       Movie grid
+    ============================ */
+    .movie-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(var(--card-w), 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    /* ============================
+       Movie card
+    ============================ */
+    .movie-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      cursor: pointer;
+      transition: var(--transition);
+      position: relative;
+    }
+    .movie-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow);
+    }
+
+    .card-poster {
+      width: 100%;
+      aspect-ratio: 2/3;
+      object-fit: cover;
+      display: block;
+      background: var(--bg3);
+    }
+
+    .card-poster-placeholder {
+      width: 100%;
+      aspect-ratio: 2/3;
+      background: linear-gradient(135deg, var(--bg3), var(--bg4));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: var(--text2);
+      padding: 12px;
+      text-align: center;
+    }
+    .card-poster-placeholder span { font-size: 0.75rem; line-height: 1.3; }
+    .card-poster-placeholder .film-icon { font-size: 2.5rem; opacity: 0.3; }
+
+    .card-body {
+      padding: 10px 12px 12px;
+    }
+    .card-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-meta {
+      font-size: 0.75rem;
+      color: var(--text2);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-stars {
+      color: var(--accent);
+      font-size: 0.75rem;
+    }
+    .card-badges {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .badge {
+      background: rgba(0,0,0,0.8);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .badge-seen { border-left: 2px solid var(--success); color: var(--success); }
+    .badge-fav  { border-left: 2px solid var(--accent);  color: var(--accent); }
+
+    /* ============================
+       Skeleton loading
+    ============================ */
+    @keyframes shimmer {
+      0%   { background-position: -400px 0; }
+      100% { background-position: 400px 0; }
+    }
+    .skeleton {
+      background: linear-gradient(90deg, var(--bg3) 25%, var(--bg4) 50%, var(--bg3) 75%);
+      background-size: 800px 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 4px;
+    }
+    .skeleton-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .skeleton-poster { width: 100%; aspect-ratio: 2/3; }
+    .skeleton-text { height: 12px; margin: 8px 12px 4px; }
+    .skeleton-text-sm { height: 10px; margin: 4px 12px 12px; width: 60%; }
+
+    /* ============================
+       Empty state
+    ============================ */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--text2);
+    }
+    .empty-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.4; }
+    .empty-state h3 { font-size: 1.1rem; margin-bottom: 6px; color: var(--text); }
+    .empty-state p { font-size: 0.88rem; }
+
+    /* ============================
+       Pagination
+    ============================ */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 20px 0;
+    }
+    .page-btn {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      transition: var(--transition);
+    }
+    .page-btn:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+    .page-btn.active { background: var(--accent); color: #0a0a0f; border-color: var(--accent); font-weight: 700; }
+    .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .page-ellipsis { color: var(--text2); font-size: 0.85rem; padding: 0 4px; }
+
+    /* ============================
+       Modal overlay
+    ============================ */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.82);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.hidden { display: none; }
+
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      max-width: 760px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+      animation: modalIn 0.2s ease;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.97); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .modal-header {
+      display: flex;
+      gap: 20px;
+      padding: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-poster {
+      width: 140px;
+      flex-shrink: 0;
+      border-radius: 6px;
+      overflow: hidden;
+      aspect-ratio: 2/3;
+      background: var(--bg3);
+    }
+    .modal-poster img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .modal-poster-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      opacity: 0.3;
+    }
+
+    .modal-info { flex: 1; min-width: 0; }
+
+    .modal-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+
+    .modal-original {
+      font-size: 0.85rem;
+      color: var(--text2);
+      margin-bottom: 12px;
+      font-style: italic;
+    }
+
+    .modal-stars {
+      color: var(--accent);
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+    }
+
+    .modal-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 16px;
+      margin-bottom: 16px;
+    }
+    .modal-meta-item { font-size: 0.82rem; }
+    .modal-meta-label { color: var(--text2); }
+    .modal-meta-value { color: var(--text); font-weight: 500; }
+
+    .modal-body { padding: 20px 24px; }
+
+    .modal-section { margin-bottom: 16px; }
+    .modal-section-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+    .modal-section-content { font-size: 0.88rem; color: var(--text); line-height: 1.6; }
+
+    .modal-scores {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .score-badge {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 14px;
+      text-align: center;
+    }
+    .score-badge .score-label { font-size: 0.68rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em; }
+    .score-badge .score-val   { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0a0a0f;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      font-weight: 700;
+      font-size: 0.88rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary:hover { background: var(--accent2); }
+
+    .btn-secondary {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      font-size: 0.88rem;
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--text); }
+
+    .btn-danger {
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      font-size: 0.88rem;
+    }
+    .btn-danger:hover { background: var(--danger); color: #fff; }
+
+    .btn-close {
+      margin-left: auto;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+    }
+    .btn-close:hover { color: var(--text); border-color: var(--accent); }
+
+    /* Dropdown menu για "Προσθήκη στη λίστα μου" */
+    .dropdown-wrap { position: relative; }
+    .dropdown-menu {
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      min-width: 220px;
+      box-shadow: var(--shadow);
+      z-index: 10;
+      margin-bottom: 4px;
+      display: none;
+    }
+    .dropdown-menu.open { display: block; }
+    .dropdown-item {
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      color: var(--text2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+    .dropdown-item:last-child { border-bottom: none; }
+    .dropdown-item:hover { background: var(--bg4); color: var(--text); }
+
+    /* ============================
+       "Η Λίστα μου" tab
+    ============================ */
+    .list-panel { display: none; }
+    .list-panel.active { display: block; }
+
+    .list-subtabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .list-subtab {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .list-subtab:hover { color: var(--text); border-color: var(--accent); }
+    .list-subtab.active { background: var(--accent); color: #0a0a0f; border-color: var(--accent); font-weight: 700; }
+
+    .list-toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .list-toolbar input { flex: 1; min-width: 180px; }
+    .list-toolbar select { min-width: 140px; }
+
+    .user-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .user-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+    .user-card-del {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: rgba(0,0,0,0.7);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      border-radius: 4px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: var(--transition);
+    }
+    .user-card:hover .user-card-del { opacity: 1; }
+    .user-card-del:hover { background: var(--danger); color: #fff; }
+
+    /* ============================
+       Scrape / Admin panel
+    ============================ */
+    .admin-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 150;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .admin-overlay.hidden { display: none; }
+
+    .admin-panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: var(--shadow);
+    }
+    .admin-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1.1rem;
+      color: var(--accent);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .admin-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .admin-row label { font-size: 0.85rem; color: var(--text2); min-width: 80px; }
+
+    .admin-key-input {
+      flex: 1;
+      min-width: 160px;
+      font-size: 0.85rem;
+    }
+
+    .progress-wrap {
+      margin: 16px 0;
+      background: var(--bg3);
+      border-radius: 4px;
+      height: 8px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+    .progress-label {
+      font-size: 0.82rem;
+      color: var(--text2);
+      margin-top: 6px;
+    }
+
+    .admin-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--text2);
+    }
+    .toggle-switch {
+      width: 36px;
+      height: 20px;
+      background: var(--bg4);
+      border-radius: 10px;
+      position: relative;
+      cursor: pointer;
+      transition: var(--transition);
+      border: 1px solid var(--border);
+    }
+    .toggle-switch.on { background: var(--accent); border-color: var(--accent); }
+    .toggle-knob {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: var(--transition);
+    }
+    .toggle-switch.on .toggle-knob { left: 18px; }
+
+    .admin-status {
+      font-size: 0.82rem;
+      padding: 8px 12px;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    .admin-status.success { background: rgba(85,204,136,0.1); color: var(--success); border: 1px solid var(--success); }
+    .admin-status.error   { background: rgba(232,85,85,0.1);  color: var(--danger);  border: 1px solid var(--danger); }
+    .admin-status.info    { background: rgba(232,184,75,0.1); color: var(--accent);  border: 1px solid var(--accent); }
+
+    /* ============================
+       Toast
+    ============================ */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 18px;
+      border-radius: var(--radius);
+      font-size: 0.88rem;
+      max-width: 320px;
+      box-shadow: var(--shadow);
+      animation: toastIn 0.25s ease;
+    }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .toast.success { border-left: 3px solid var(--success); }
+    .toast.error   { border-left: 3px solid var(--danger); }
+    .toast.info    { border-left: 3px solid var(--accent); }
+
+    /* ============================
+       Responsive adjustments
+    ============================ */
+    @media (max-width: 600px) {
+      .header-inner { gap: 12px; }
+      .logo-text    { font-size: 0.85rem; }
+      .modal-header { flex-direction: column; }
+      .modal-poster { width: 100%; max-width: 200px; margin: 0 auto; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <svg class="logo-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="36" height="36" rx="6" fill="currentColor" fill-opacity="0.12"/>
+        <circle cx="18" cy="18" r="12" stroke="currentColor" stroke-width="2"/>
+        <circle cx="18" cy="18" r="5" fill="currentColor"/>
+        <line x1="4" y1="18" x2="9" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="27" y1="18" x2="32" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="18" y1="4" x2="18" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="18" y1="27" x2="18" y2="32" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <div class="logo-text">Αθηνόραμα</div>
+        <div class="logo-sub">Αρχείο Ταινιών</div>
+      </div>
+    </div>
+
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="archive">🎬 Αρχείο</button>
+      <button class="nav-tab" data-tab="mylist">⭐ Η Λίστα μου</button>
+    </nav>
+
+    <div class="header-actions">
+      <button class="btn-icon" id="adminBtn" title="Διαχείριση / Scraping">⚙</button>
+    </div>
+  </div>
+</header>
+
+<!-- ========== MAIN ========== -->
+<main class="main">
+
+  <!-- ===== ARCHIVE TAB ===== -->
+  <div id="archiveTab">
+
+    <!-- Filters -->
+    <div class="filters-panel">
+      <div class="filter-group">
+        <label class="filter-label">Αναζήτηση</label>
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="searchInput" placeholder="Τίτλος ταινίας…" />
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Έτος</label>
+        <div class="filter-range">
+          <input type="number" id="yearFrom" placeholder="Από" min="1900" max="2099" />
+          <input type="number" id="yearTo"   placeholder="Έως" min="1900" max="2099" />
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Αστεράκια</label>
+        <div class="filter-range">
+          <input type="number" id="starsMin" placeholder="Ελάχ." min="1" max="5" step="0.5" />
+          <input type="number" id="starsMax" placeholder="Μέγ."  min="1" max="5" step="0.5" />
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Χώρα</label>
+        <select id="countrySelect">
+          <option value="">Όλες</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Είδος</label>
+        <select id="genreSelect">
+          <option value="">Όλα</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">Διάρκεια (λεπτά)</label>
+        <div class="filter-range">
+          <input type="number" id="durMin" placeholder="Από" min="1" />
+          <input type="number" id="durMax" placeholder="Έως" min="1" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-group">
+        <span class="toolbar-label">Ταξινόμηση</span>
+        <select class="toolbar-select" id="sortBy">
+          <option value="year">Έτος</option>
+          <option value="stars">Αστεράκια</option>
+          <option value="title">Τίτλος</option>
+          <option value="duration">Διάρκεια</option>
+        </select>
+        <button class="sort-dir-btn" id="sortDirBtn" title="Αλλαγή κατεύθυνσης">↓</button>
+      </div>
+
+      <div class="toolbar-group">
+        <span class="toolbar-label">Ανά σελίδα</span>
+        <select class="toolbar-select" id="perPage">
+          <option value="24">24</option>
+          <option value="48">48</option>
+          <option value="96">96</option>
+        </select>
+      </div>
+
+      <button class="toolbar-btn accent" id="randomBtn">🎲 Τυχαία</button>
+      <button class="toolbar-btn" id="clearFiltersBtn">✕ Καθαρισμός</button>
+
+      <span class="results-count" id="resultsCount"></span>
+    </div>
+
+    <!-- Grid -->
+    <div class="movie-grid" id="movieGrid"></div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <!-- ===== MY LIST TAB ===== -->
+  <div id="mylistTab" class="list-panel">
+    <div class="list-subtabs">
+      <button class="list-subtab active" data-listtype="seen">👁 Έχω δει</button>
+      <button class="list-subtab" data-listtype="favourite">⭐ Αγαπημένα</button>
+      <button class="list-subtab" data-listtype="series_seen">📺 Σειρές (είδα)</button>
+      <button class="list-subtab" data-listtype="series_favourite">💎 Αγαπημένες σειρές</button>
+    </div>
+
+    <div class="list-toolbar">
+      <input type="text" id="listSearch" placeholder="Αναζήτηση στη λίστα…" />
+      <select id="listGenre">
+        <option value="">Όλα τα είδη</option>
+      </select>
+      <button class="toolbar-btn" id="syncSheetsBtn">🔄 Sync από Sheets</button>
+    </div>
+
+    <div class="movie-grid" id="userGrid"></div>
+  </div>
+
+</main>
+
+<!-- ========== MOVIE MODAL ========== -->
+<div class="modal-overlay hidden" id="movieModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <div class="modal-poster" id="modalPoster"></div>
+      <div class="modal-info">
+        <div class="modal-title" id="modalTitle"></div>
+        <div class="modal-original" id="modalOriginal"></div>
+        <div class="modal-stars" id="modalStars"></div>
+        <div class="modal-meta-grid" id="modalMeta"></div>
+        <!-- Scores από user_movies (αν υπάρχουν) -->
+        <div class="modal-scores" id="modalScores"></div>
+        <!-- List type badge -->
+        <div id="modalListBadge"></div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section" id="modalCastSection">
+        <div class="modal-section-title">Ηθοποιοί</div>
+        <div class="modal-section-content" id="modalCast"></div>
+      </div>
+      <div class="modal-section" id="modalDescSection">
+        <div class="modal-section-title">Περιγραφή</div>
+        <div class="modal-section-content" id="modalDesc"></div>
+      </div>
+      <div class="modal-section" id="modalSimilarSection">
+        <div class="modal-section-title">Παρόμοιες ταινίες</div>
+        <div class="modal-section-content" id="modalSimilar"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div class="dropdown-wrap">
+        <button class="btn-primary" id="addToListBtn">+ Προσθήκη στη λίστα μου</button>
+        <div class="dropdown-menu" id="addToListMenu">
+          <button class="dropdown-item" data-listtype="seen">👁 Ταινίες που έχω δει</button>
+          <button class="dropdown-item" data-listtype="favourite">⭐ Αγαπημένες ταινίες</button>
+          <button class="dropdown-item" data-listtype="series_seen">📺 Σειρές που έχω δει</button>
+          <button class="dropdown-item" data-listtype="series_favourite">💎 Αγαπημένες σειρές</button>
+        </div>
+      </div>
+      <a class="btn-secondary" id="modalAthinoramaLink" href="#" target="_blank" rel="noopener">🔗 Athinorama</a>
+      <a class="btn-secondary hidden" id="modalTrailerLink" href="#" target="_blank" rel="noopener">▶ Trailer</a>
+      <button class="btn-close" id="modalClose">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== ADMIN / SCRAPE PANEL ========== -->
+<div class="admin-overlay hidden" id="adminOverlay">
+  <div class="admin-panel">
+    <div class="admin-title">⚙ Διαχείριση Scraping</div>
+
+    <div class="admin-row">
+      <label>API Key</label>
+      <input type="password" class="admin-key-input" id="scrapeKey" placeholder="SCRAPE_API_KEY" />
+    </div>
+
+    <div class="admin-row">
+      <label>Mode</label>
+      <select id="scrapeMode" style="flex:1;">
+        <option value="incremental">Incremental (νέες μόνο)</option>
+        <option value="full">Full (όλο το αρχείο)</option>
+      </select>
+    </div>
+
+    <div class="admin-row">
+      <div class="admin-toggle">
+        <div class="toggle-switch" id="fullRescrapeToggle"><div class="toggle-knob"></div></div>
+        <span>Full rescrape (αντικατάσταση υπαρχόντων)</span>
+      </div>
+    </div>
+
+    <div class="admin-row">
+      <button class="toolbar-btn accent" id="startScrapeBtn">▶ Έναρξη</button>
+      <button class="toolbar-btn" id="refreshStatusBtn">↺ Status</button>
+      <button class="btn-close" id="adminClose" style="margin-left:auto;">✕</button>
+    </div>
+
+    <div class="progress-wrap" id="scrapeProgressWrap" style="display:none;">
+      <div class="progress-bar" id="scrapeProgressBar" style="width:0%"></div>
+    </div>
+    <div class="progress-label" id="scrapeProgressLabel"></div>
+
+    <div class="admin-status hidden" id="adminStatus"></div>
+  </div>
+</div>
+
+<!-- ========== TOAST CONTAINER ========== -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+/* ==============================================
+   Ρύθμιση BACKEND URL
+   Άλλαξε το παρακάτω URL στο Railway URL σου.
+============================================== */
+const BACKEND_URL = (window.BACKEND_URL || 'http://localhost:5000').replace(/\/$/, '');
+
+/* ==============================================
+   State
+============================================== */
+const state = {
+  tab: 'archive',         // 'archive' | 'mylist'
+  filters: {},
+  sortBy: 'year',
+  sortDir: 'desc',
+  page: 1,
+  perPage: 24,
+  totalPages: 1,
+  listType: 'seen',
+  fullRescrape: false,
+  scrapeId: null,
+  scrapeInterval: null,
+  currentMovie: null,      // Ταινία ανοιχτή στο modal
+  userMovies: [],          // Cache από user movies
+  abortController: null,
+};
+
+/* ==============================================
+   API helper
+============================================== */
+async function api(path, options = {}) {
+  if (state.abortController && options._abort) {
+    state.abortController.abort();
+  }
+  const controller = new AbortController();
+  if (options._abort) {
+    state.abortController = controller;
+  }
+  const { _abort, ...fetchOptions } = options;
+
+  try {
+    const res = await fetch(BACKEND_URL + path, {
+      ...fetchOptions,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(fetchOptions.headers || {}),
+      },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || res.statusText);
+    }
+    return await res.json();
+  } catch (e) {
+    if (e.name === 'AbortError') return null;
+    throw e;
+  }
+}
+
+/* ==============================================
+   Toast
+============================================== */
+function toast(msg, type = 'info', duration = 3500) {
+  const wrap = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+/* ==============================================
+   Stars rendering
+============================================== */
+function renderStars(stars) {
+  if (!stars && stars !== 0) return '';
+  const full  = Math.floor(stars);
+  const half  = stars % 1 >= 0.5 ? 1 : 0;
+  const empty = 5 - full - half;
+  return '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(empty);
+}
+
+/* ==============================================
+   Poster helpers
+============================================== */
+function posterImg(url, title) {
+  if (url) {
+    return `<img class="card-poster" src="${escHtml(url)}" alt="${escHtml(title)}" loading="lazy" onerror="this.replaceWith(posterPlaceholder('${escHtml(title)}'))" />`;
+  }
+  return posterPlaceholderHTML(title);
+}
+
+function posterPlaceholder(title) {
+  const el = document.createElement('div');
+  el.className = 'card-poster-placeholder';
+  el.innerHTML = `<span class="film-icon">🎬</span><span>${escHtml(title)}</span>`;
+  return el;
+}
+
+function posterPlaceholderHTML(title) {
+  return `<div class="card-poster-placeholder"><span class="film-icon">🎬</span><span>${escHtml(title)}</span></div>`;
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ==============================================
+   Skeleton loading
+============================================== */
+function renderSkeletons(count = 24) {
+  return Array.from({length: count}, () => `
+    <div class="skeleton-card">
+      <div class="skeleton skeleton-poster"></div>
+      <div class="skeleton skeleton-text"></div>
+      <div class="skeleton skeleton-text-sm"></div>
+    </div>
+  `).join('');
+}
+
+/* ==============================================
+   User movies badge helper
+============================================== */
+function getUserMovieBadges(title) {
+  const badges = [];
+  const t = (title || '').toLowerCase();
+  const um = state.userMovies.filter(m => (m.title || '').toLowerCase() === t);
+  const types = um.map(m => m.list_type);
+  if (types.includes('seen') || types.includes('series_seen'))
+    badges.push('<div class="badge badge-seen">👁 Είδα</div>');
+  if (types.includes('favourite') || types.includes('series_favourite'))
+    badges.push('<div class="badge badge-fav">⭐ Αγαπημένο</div>');
+  return badges.join('');
+}
+
+/* ==============================================
+   Movie card
+============================================== */
+function renderMovieCard(movie, isUserMovie = false) {
+  const badges = isUserMovie ? '' : getUserMovieBadges(movie.title);
+  const listTypeBadge = isUserMovie ? `<div class="badge badge-seen" style="font-size:0.7rem">${escHtml(movie.list_type || '')}</div>` : '';
+
+  const card = document.createElement('div');
+  card.className = isUserMovie ? 'movie-card user-card' : 'movie-card';
+  card.dataset.id = movie.id || '';
+  card.dataset.movieJson = JSON.stringify(movie);
+
+  card.innerHTML = `
+    ${badges ? `<div class="card-badges">${badges}</div>` : ''}
+    ${isUserMovie ? `<div class="card-badges">${listTypeBadge}</div>` : ''}
+    ${posterImg(movie.poster_url || movie.poster, movie.title)}
+    <div class="card-body">
+      <div class="card-title">${escHtml(movie.title)}</div>
+      <div class="card-meta">
+        <span>${movie.year || '—'}</span>
+        ${movie.country ? `<span>·</span><span>${escHtml(movie.country)}</span>` : ''}
+        ${movie.stars ? `<span class="card-stars">${renderStars(movie.stars)}</span>` : ''}
+      </div>
+    </div>
+    ${isUserMovie ? `<button class="user-card-del" data-docid="${escHtml(movie.id)}" title="Διαγραφή">✕</button>` : ''}
+  `;
+
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.user-card-del')) return;
+    openModal(movie, isUserMovie);
+  });
+
+  if (isUserMovie) {
+    card.querySelector('.user-card-del').addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteUserMovie(movie.id, card);
+    });
+  }
+
+  return card;
+}
+
+/* ==============================================
+   Load & render movies (Archive tab)
+============================================== */
+async function loadMovies() {
+  const grid = document.getElementById('movieGrid');
+  grid.innerHTML = renderSkeletons(state.perPage);
+
+  const params = new URLSearchParams({
+    sort_by: state.sortBy,
+    sort_dir: state.sortDir,
+    page: state.page,
+    per_page: state.perPage,
+  });
+
+  const f = state.filters;
+  if (f.q)          params.set('q', f.q);
+  if (f.yearFrom)   params.set('year_from', f.yearFrom);
+  if (f.yearTo)     params.set('year_to', f.yearTo);
+  if (f.starsMin)   params.set('stars_min', f.starsMin);
+  if (f.starsMax)   params.set('stars_max', f.starsMax);
+  if (f.country)    params.set('country', f.country);
+  if (f.genre)      params.set('genre', f.genre);
+  if (f.durMin)     params.set('duration_min', f.durMin);
+  if (f.durMax)     params.set('duration_max', f.durMax);
+
+  try {
+    const data = await api(`/api/movies?${params}`, { _abort: true });
+    if (!data) return;
+
+    state.totalPages = data.pages || 1;
+    document.getElementById('resultsCount').textContent =
+      `${data.total.toLocaleString('el-GR')} ταινίες`;
+
+    grid.innerHTML = '';
+    if (!data.movies || data.movies.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🎬</div>
+          <h3>Δεν βρέθηκαν ταινίες</h3>
+          <p>Δοκίμασε διαφορετικά φίλτρα ή ξεκίνα το scraping.</p>
+        </div>`;
+    } else {
+      data.movies.forEach(m => grid.appendChild(renderMovieCard(m)));
+    }
+
+    renderPagination();
+  } catch (e) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">⚠</div>
+        <h3>Σφάλμα σύνδεσης</h3>
+        <p>${escHtml(e.message)}</p>
+      </div>`;
+  }
+}
+
+/* ==============================================
+   Pagination
+============================================== */
+function renderPagination() {
+  const wrap = document.getElementById('pagination');
+  wrap.innerHTML = '';
+  const { page, totalPages } = state;
+  if (totalPages <= 1) return;
+
+  const mkBtn = (label, p, active = false, disabled = false) => {
+    const btn = document.createElement('button');
+    btn.className = 'page-btn' + (active ? ' active' : '');
+    btn.textContent = label;
+    btn.disabled = disabled;
+    if (!disabled && !active) btn.addEventListener('click', () => goToPage(p));
+    return btn;
+  };
+
+  wrap.appendChild(mkBtn('‹', page - 1, false, page === 1));
+
+  const pages = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (page > 3) pages.push('…');
+    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
+    if (page < totalPages - 2) pages.push('…');
+    pages.push(totalPages);
+  }
+
+  pages.forEach(p => {
+    if (p === '…') {
+      const el = document.createElement('span');
+      el.className = 'page-ellipsis';
+      el.textContent = '…';
+      wrap.appendChild(el);
+    } else {
+      wrap.appendChild(mkBtn(p, p, p === page));
+    }
+  });
+
+  wrap.appendChild(mkBtn('›', page + 1, false, page === totalPages));
+}
+
+function goToPage(p) {
+  state.page = p;
+  loadMovies();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ==============================================
+   Random movie
+============================================== */
+async function loadRandom() {
+  try {
+    const movie = await api('/api/movies/random');
+    if (movie) openModal(movie, false);
+  } catch (e) {
+    toast('Σφάλμα: ' + e.message, 'error');
+  }
+}
+
+/* ==============================================
+   Filter metadata (countries, genres)
+============================================== */
+async function loadFiltersMeta() {
+  try {
+    const data = await api('/api/filters/meta');
+    const cs = document.getElementById('countrySelect');
+    const gs = document.getElementById('genreSelect');
+    const lg = document.getElementById('listGenre');
+
+    data.countries?.forEach(c => {
+      cs.add(new Option(c, c));
+    });
+    data.genres?.forEach(g => {
+      gs.add(new Option(g, g));
+      lg.add(new Option(g, g));
+    });
+  } catch (e) {
+    // Αθόρυβη αποτυχία — dropdowns μένουν κενά
+  }
+}
+
+/* ==============================================
+   Modal
+============================================== */
+function openModal(movie, isUserEntry = false) {
+  state.currentMovie = movie;
+
+  document.getElementById('modalTitle').textContent = movie.title || '—';
+  document.getElementById('modalOriginal').textContent = movie.title_original || '';
+  document.getElementById('modalStars').textContent =
+    movie.stars ? `${renderStars(movie.stars)} (${movie.stars})` : '';
+
+  // Poster
+  const pWrap = document.getElementById('modalPoster');
+  const pUrl = movie.poster_url || movie.poster || '';
+  if (pUrl) {
+    pWrap.innerHTML = `<img src="${escHtml(pUrl)}" alt="${escHtml(movie.title)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<div class=modal-poster-placeholder>🎬</div>'" />`;
+  } else {
+    pWrap.innerHTML = '<div class="modal-poster-placeholder">🎬</div>';
+  }
+
+  // Meta grid
+  const meta = [
+    ['Έτος', movie.year],
+    ['Χώρα', movie.country],
+    ['Είδος', Array.isArray(movie.genre) ? movie.genre.join(', ') : movie.genre],
+    ['Σκηνοθεσία', Array.isArray(movie.director) ? movie.director.join(', ') : movie.director],
+    ['Διάρκεια', movie.duration ? `${movie.duration} λεπτά` : null],
+  ].filter(([, v]) => v);
+
+  document.getElementById('modalMeta').innerHTML = meta.map(([l, v]) =>
+    `<div class="modal-meta-item"><span class="modal-meta-label">${escHtml(l)}: </span><span class="modal-meta-value">${escHtml(String(v))}</span></div>`
+  ).join('');
+
+  // Scores (user movie fields)
+  const scores = [];
+  if (movie.imdb_score)        scores.push(['IMDb', movie.imdb_score]);
+  if (movie.tmdb_score)        scores.push(['TMDB', movie.tmdb_score]);
+  if (movie.rotten_tomatoes)   scores.push(['RT', movie.rotten_tomatoes]);
+  document.getElementById('modalScores').innerHTML = scores.map(([l, v]) =>
+    `<div class="score-badge"><div class="score-label">${escHtml(l)}</div><div class="score-val">${escHtml(String(v))}</div></div>`
+  ).join('');
+
+  // Cast
+  const cast = Array.isArray(movie.cast) ? movie.cast.join(', ') : (movie.cast || '');
+  const castSec = document.getElementById('modalCastSection');
+  document.getElementById('modalCast').textContent = cast;
+  castSec.style.display = cast ? '' : 'none';
+
+  // Description
+  const desc = movie.description || '';
+  const descSec = document.getElementById('modalDescSection');
+  document.getElementById('modalDesc').textContent = desc;
+  descSec.style.display = desc ? '' : 'none';
+
+  // Similar
+  const similar = movie.similar || '';
+  const simSec = document.getElementById('modalSimilarSection');
+  document.getElementById('modalSimilar').textContent = similar;
+  simSec.style.display = similar ? '' : 'none';
+
+  // Athinorama link
+  const athLink = document.getElementById('modalAthinoramaLink');
+  const url = movie.athinorama_url || '';
+  athLink.href = url;
+  athLink.style.display = url ? '' : 'none';
+
+  // Trailer link
+  const trLink = document.getElementById('modalTrailerLink');
+  const trailer = movie.trailer_link || '';
+  trLink.href = trailer;
+  trLink.classList.toggle('hidden', !trailer);
+
+  document.getElementById('movieModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('movieModal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+/* ==============================================
+   Add to list
+============================================== */
+document.getElementById('addToListBtn').addEventListener('click', () => {
+  document.getElementById('addToListMenu').classList.toggle('open');
+});
+
+document.getElementById('addToListMenu').querySelectorAll('.dropdown-item').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.getElementById('addToListMenu').classList.remove('open');
+    const listType = btn.dataset.listtype;
+    const m = state.currentMovie;
+    if (!m) return;
+
+    const entry = {
+      title: m.title || '',
+      title_greek: m.title || '',
+      list_type: listType,
+      year: m.year || null,
+      genre: Array.isArray(m.genre) ? m.genre.join(', ') : (m.genre || ''),
+      director: Array.isArray(m.director) ? m.director.join(', ') : (m.director || ''),
+      cast: Array.isArray(m.cast) ? m.cast.join(', ') : (m.cast || ''),
+      poster: m.poster_url || m.poster || '',
+      duration: m.duration ? String(m.duration) : '',
+      athinorama_id: m.id || null,
+    };
+
+    try {
+      await api('/api/user/movies', { method: 'POST', body: JSON.stringify(entry) });
+      toast(`"${m.title}" προστέθηκε στη λίστα!`, 'success');
+      loadUserMovies();
+    } catch (e) {
+      toast('Σφάλμα: ' + e.message, 'error');
+    }
+  });
+});
+
+/* ==============================================
+   User movies (My List tab)
+============================================== */
+async function loadUserMovies() {
+  const grid = document.getElementById('userGrid');
+  grid.innerHTML = renderSkeletons(8);
+
+  try {
+    const data = await api(`/api/user/movies?list_type=${state.listType}`);
+    state.userMovies = data.movies || [];
+    renderUserGrid();
+  } catch (e) {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠</div><h3>Σφάλμα</h3><p>${escHtml(e.message)}</p></div>`;
+  }
+}
+
+function renderUserGrid() {
+  const grid = document.getElementById('userGrid');
+  const search = (document.getElementById('listSearch').value || '').toLowerCase();
+  const genre = (document.getElementById('listGenre').value || '').toLowerCase();
+
+  let movies = state.userMovies;
+  if (search) {
+    movies = movies.filter(m => (m.title || '').toLowerCase().includes(search));
+  }
+  if (genre) {
+    movies = movies.filter(m => (m.genre || '').toLowerCase().includes(genre));
+  }
+
+  grid.innerHTML = '';
+  if (movies.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <h3>Η λίστα είναι άδεια</h3>
+        <p>Πρόσθεσε ταινίες από το Αρχείο ή κάνε Sync από Google Sheets.</p>
+      </div>`;
+  } else {
+    movies.forEach(m => grid.appendChild(renderMovieCard(m, true)));
+  }
+}
+
+async function deleteUserMovie(docId, cardEl) {
+  if (!confirm('Να διαγραφεί αυτή η εγγραφή;')) return;
+  try {
+    await api(`/api/user/movies/${encodeURIComponent(docId)}`, { method: 'DELETE' });
+    cardEl.remove();
+    state.userMovies = state.userMovies.filter(m => m.id !== docId);
+    toast('Η εγγραφή διαγράφηκε.', 'info');
+  } catch (e) {
+    toast('Σφάλμα διαγραφής: ' + e.message, 'error');
+  }
+}
+
+/* ==============================================
+   Sync from Sheets
+============================================== */
+document.getElementById('syncSheetsBtn').addEventListener('click', async () => {
+  const key = prompt('Εισάγετε SYNC_API_KEY:');
+  if (key === null) return;
+  try {
+    const res = await api('/api/user/sync', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({ sheet: '', rows: [] }),
+    });
+    toast(`Sync ολοκληρώθηκε: ${res.synced} εγγραφές`, 'success');
+    loadUserMovies();
+  } catch (e) {
+    toast('Σφάλμα sync: ' + e.message, 'error');
+  }
+});
+
+/* ==============================================
+   Scraping panel
+============================================== */
+document.getElementById('adminBtn').addEventListener('click', () => {
+  document.getElementById('adminOverlay').classList.remove('hidden');
+  refreshScrapeStatus();
+});
+document.getElementById('adminClose').addEventListener('click', () => {
+  document.getElementById('adminOverlay').classList.add('hidden');
+});
+
+document.getElementById('fullRescrapeToggle').addEventListener('click', function() {
+  state.fullRescrape = !state.fullRescrape;
+  this.classList.toggle('on', state.fullRescrape);
+});
+
+document.getElementById('startScrapeBtn').addEventListener('click', async () => {
+  const key = document.getElementById('scrapeKey').value.trim();
+  const mode = document.getElementById('scrapeMode').value;
+
+  setAdminStatus('Εκκίνηση scraping…', 'info');
+  try {
+    const res = await api('/api/scrape/start', {
+      method: 'POST',
+      body: JSON.stringify({ api_key: key, mode, full_rescrape: state.fullRescrape }),
+    });
+    state.scrapeId = res.scrape_id;
+    toast(`Scraping ξεκίνησε! ID: ${res.scrape_id}`, 'success');
+    startScrapePolling();
+  } catch (e) {
+    setAdminStatus('Σφάλμα: ' + e.message, 'error');
+  }
+});
+
+document.getElementById('refreshStatusBtn').addEventListener('click', refreshScrapeStatus);
+
+async function refreshScrapeStatus() {
+  try {
+    const qs = state.scrapeId ? `?scrape_id=${state.scrapeId}` : '';
+    const job = await api('/api/scrape/status' + qs);
+    updateScrapeUI(job);
+  } catch (e) {
+    setAdminStatus('Δεν βρέθηκε ενεργό job.', 'info');
+  }
+}
+
+function updateScrapeUI(job) {
+  if (!job) return;
+  const pct = job.total ? Math.round((job.done / job.total) * 100) : 0;
+  document.getElementById('scrapeProgressWrap').style.display = '';
+  document.getElementById('scrapeProgressBar').style.width = pct + '%';
+  document.getElementById('scrapeProgressLabel').textContent =
+    `${job.done} / ${job.total} ταινίες — ${job.status} — σφάλματα: ${job.errors || 0}`;
+
+  if (job.status === 'completed') {
+    setAdminStatus(`✓ Ολοκληρώθηκε: ${job.done} ταινίες αποθηκεύτηκαν.`, 'success');
+    stopScrapePolling();
+  } else if (job.status === 'error') {
+    setAdminStatus(`✗ Σφάλμα: ${job.error_message || 'Άγνωστο'}`, 'error');
+    stopScrapePolling();
+  } else {
+    setAdminStatus(`Σε εξέλιξη… (${pct}%)`, 'info');
+  }
+}
+
+function startScrapePolling() {
+  stopScrapePolling();
+  state.scrapeInterval = setInterval(refreshScrapeStatus, 3000);
+}
+
+function stopScrapePolling() {
+  if (state.scrapeInterval) {
+    clearInterval(state.scrapeInterval);
+    state.scrapeInterval = null;
+  }
+}
+
+function setAdminStatus(msg, type) {
+  const el = document.getElementById('adminStatus');
+  el.textContent = msg;
+  el.className = `admin-status ${type}`;
+  el.classList.remove('hidden');
+}
+
+/* ==============================================
+   Filter & toolbar event listeners
+============================================== */
+let searchDebounce = null;
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => {
+    state.filters.q = e.target.value.trim();
+    state.page = 1;
+    loadMovies();
+  }, 300);
+});
+
+function addFilterListener(id, key) {
+  document.getElementById(id).addEventListener('change', (e) => {
+    state.filters[key] = e.target.value;
+    state.page = 1;
+    loadMovies();
+  });
+}
+addFilterListener('yearFrom', 'yearFrom');
+addFilterListener('yearTo', 'yearTo');
+addFilterListener('starsMin', 'starsMin');
+addFilterListener('starsMax', 'starsMax');
+addFilterListener('countrySelect', 'country');
+addFilterListener('genreSelect', 'genre');
+addFilterListener('durMin', 'durMin');
+addFilterListener('durMax', 'durMax');
+
+document.getElementById('sortBy').addEventListener('change', (e) => {
+  state.sortBy = e.target.value;
+  state.page = 1;
+  loadMovies();
+});
+
+document.getElementById('sortDirBtn').addEventListener('click', function() {
+  state.sortDir = state.sortDir === 'desc' ? 'asc' : 'desc';
+  this.textContent = state.sortDir === 'desc' ? '↓' : '↑';
+  state.page = 1;
+  loadMovies();
+});
+
+document.getElementById('perPage').addEventListener('change', (e) => {
+  state.perPage = parseInt(e.target.value);
+  state.page = 1;
+  loadMovies();
+});
+
+document.getElementById('randomBtn').addEventListener('click', loadRandom);
+
+document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+  state.filters = {};
+  state.page = 1;
+  document.getElementById('searchInput').value = '';
+  document.getElementById('yearFrom').value = '';
+  document.getElementById('yearTo').value = '';
+  document.getElementById('starsMin').value = '';
+  document.getElementById('starsMax').value = '';
+  document.getElementById('countrySelect').value = '';
+  document.getElementById('genreSelect').value = '';
+  document.getElementById('durMin').value = '';
+  document.getElementById('durMax').value = '';
+  loadMovies();
+});
+
+/* ==============================================
+   Tab navigation
+============================================== */
+document.querySelectorAll('.nav-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.tab = btn.dataset.tab;
+
+    document.getElementById('archiveTab').style.display = state.tab === 'archive' ? '' : 'none';
+    document.getElementById('mylistTab').classList.toggle('active', state.tab === 'mylist');
+
+    if (state.tab === 'mylist') loadUserMovies();
+  });
+});
+
+/* ==============================================
+   My List sub-tabs
+============================================== */
+document.querySelectorAll('.list-subtab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.list-subtab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.listType = btn.dataset.listtype;
+    loadUserMovies();
+  });
+});
+
+document.getElementById('listSearch').addEventListener('input', () => renderUserGrid());
+document.getElementById('listGenre').addEventListener('change', () => renderUserGrid());
+
+/* ==============================================
+   Modal close handlers
+============================================== */
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('movieModal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeModal();
+    document.getElementById('adminOverlay').classList.add('hidden');
+    document.getElementById('addToListMenu').classList.remove('open');
+  }
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.dropdown-wrap')) {
+    document.getElementById('addToListMenu').classList.remove('open');
+  }
+});
+
+/* ==============================================
+   Init
+============================================== */
+(async function init() {
+  await loadFiltersMeta();
+  await loadMovies();
+})();
+</script>
+</body>
+</html>

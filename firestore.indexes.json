@@ -1,0 +1,76 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "movies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "year",  "order": "DESCENDING" },
+        { "fieldPath": "stars", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "movies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "country", "order": "ASCENDING" },
+        { "fieldPath": "year",    "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "movies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "year",  "order": "ASCENDING" },
+        { "fieldPath": "stars", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "movies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "year",     "order": "DESCENDING" },
+        { "fieldPath": "duration", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "movies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "stars",    "order": "DESCENDING" },
+        { "fieldPath": "duration", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "movies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "country", "order": "ASCENDING" },
+        { "fieldPath": "stars",   "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "movies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "title", "order": "ASCENDING" },
+        { "fieldPath": "year",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "scrape_jobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "started_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "user_movies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "list_type",  "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

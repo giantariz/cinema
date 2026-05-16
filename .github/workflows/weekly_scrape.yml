@@ -1,0 +1,58 @@
+name: Weekly Incremental Scrape
+
+on:
+  schedule:
+    # Κάθε Κυριακή 03:00 UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Scrape mode'
+        required: true
+        default: 'incremental'
+        type: choice
+        options:
+          - incremental
+          - full
+
+jobs:
+  scrape:
+    name: Trigger Athinorama Scrape
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Trigger scraping στο backend
+        run: |
+          MODE="${{ github.event.inputs.mode || 'incremental' }}"
+          echo "Εκκίνηση scraping — mode: $MODE"
+
+          RESPONSE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST "${{ secrets.BACKEND_URL }}/api/scrape/start" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${{ secrets.SCRAPE_API_KEY }}" \
+            -d "{\"mode\": \"$MODE\", \"api_key\": \"${{ secrets.SCRAPE_API_KEY }}\"}")
+
+          echo "HTTP status: $RESPONSE"
+          cat /tmp/response.json
+
+          if [ "$RESPONSE" != "202" ]; then
+            echo "Αποτυχία εκκίνησης scraping (HTTP $RESPONSE)"
+            exit 1
+          fi
+
+          SCRAPE_ID=$(cat /tmp/response.json | python3 -c "import json,sys; print(json.load(sys.stdin).get('scrape_id',''))")
+          echo "Scrape ID: $SCRAPE_ID"
+          echo "SCRAPE_ID=$SCRAPE_ID" >> $GITHUB_ENV
+
+      - name: Επαλήθευση εκκίνησης
+        run: |
+          sleep 5
+          STATUS=$(curl -s "${{ secrets.BACKEND_URL }}/api/scrape/status?scrape_id=$SCRAPE_ID" \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('status','unknown'))")
+          echo "Scrape status: $STATUS"
+          if [ "$STATUS" = "error" ]; then
+            echo "Scraping ξεκίνησε με σφάλμα!"
+            exit 1
+          fi
+          echo "✅ Scraping ξεκίνησε επιτυχώς"
