@@ -174,6 +174,14 @@ def save_movie_trailer(movie_id: str, video_id: str) -> None:
     )
 
 
+def save_movie_imdb_url(movie_id: str, imdb_url: str) -> None:
+    """Αποθηκεύει το IMDb URL σε υπάρχον movie doc."""
+    db = _get_db()
+    db.collection("movies").document(str(movie_id)).set(
+        {"imdb_url": imdb_url}, merge=True
+    )
+
+
 def get_distinct_countries() -> list[str]:
     """Επιστρέφει λίστα χωρών για dropdown."""
     db = _get_db()
