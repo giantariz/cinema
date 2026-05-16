@@ -220,6 +220,47 @@ def get_movie_imdb(movie_id: str):
 
 
 # ---------------------------------------------------------------------------
+# TMDB enrichment endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/api/movies/<movie_id>/enrich")
+def enrich_movie(movie_id: str):
+    """Εμπλουτισμός ταινίας με δεδομένα από TMDB (genre, cast, director, score, IMDb URL)."""
+    try:
+        movie = db.get_movie(movie_id)
+        if not movie:
+            return jsonify({"error": "Η ταινία δεν βρέθηκε"}), 404
+
+        # Αν υπάρχει ήδη tmdb_id, τα δεδομένα έχουν ήδη ληφθεί
+        if movie.get("tmdb_id"):
+            return jsonify(movie), 200
+
+        tmdb_data = scraper.find_tmdb_data(
+            title=movie.get("title", ""),
+            original_title=movie.get("title_original", ""),
+            year=movie.get("year"),
+        )
+
+        if not tmdb_data:
+            return jsonify({"enriched": False, **movie}), 200
+
+        # Ενημέρωσε μόνο κενά πεδία (μη αντικατάσταση υπαρχόντων)
+        update = {"tmdb_id": tmdb_data["tmdb_id"]}
+        for field in ("genre", "director", "cast", "description", "imdb_score", "imdb_url", "imdb_id"):
+            if tmdb_data.get(field) and not movie.get(field):
+                update[field] = tmdb_data[field]
+
+        db.save_movie_tmdb_data(movie_id, update)
+        movie.update(update)
+
+        return jsonify({**movie, "enriched": True}), 200
+
+    except Exception as e:
+        logger.error("Σφάλμα enrich_movie %s: %s", movie_id, e)
+        return jsonify({"error": "Εσωτερικό σφάλμα"}), 500
+
+
+# ---------------------------------------------------------------------------
 # Scraping endpoints
 # ---------------------------------------------------------------------------
 

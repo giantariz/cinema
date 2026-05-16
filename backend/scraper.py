@@ -3,6 +3,7 @@ Scraper για τις κριτικές ταινιών του Athinorama.
 Rate limiting: 1-2 δευτερόλεπτα delay μεταξύ requests.
 """
 import logging
+import os
 import re
 import time
 import random
@@ -36,6 +37,9 @@ HEADERS = {
 
 SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
+
+TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
+TMDB_BASE = "https://api.themoviedb.org/3"
 
 
 # ---------------------------------------------------------------------------
@@ -488,6 +492,79 @@ def find_imdb_url(title: str, original_title: str = "", year: int | None = None)
         logger.warning("IMDb search αποτυχία για '%s': %s", query, e)
 
     return None
+
+
+def find_tmdb_data(title: str, original_title: str = "", year: int | None = None) -> dict | None:
+    """
+    Εμπλουτισμός ταινίας μέσω TMDB API.
+    Επιστρέφει dict με genre, director, cast, description, imdb_score, imdb_url ή None.
+    """
+    if not TMDB_API_KEY:
+        logger.warning("TMDB_API_KEY δεν έχει οριστεί")
+        return None
+
+    def _search(query: str) -> list:
+        params = {"api_key": TMDB_API_KEY, "query": query, "language": "el"}
+        if year:
+            params["year"] = year
+        try:
+            r = requests.get(f"{TMDB_BASE}/search/movie", params=params, timeout=10)
+            r.raise_for_status()
+            return r.json().get("results", [])
+        except Exception as e:
+            logger.warning("TMDB search αποτυχία για '%s': %s", query, e)
+            return []
+
+    results = _search(original_title or title)
+    if not results and original_title:
+        results = _search(title)
+    if not results:
+        logger.info("TMDB: δεν βρέθηκε αποτέλεσμα για '%s'", title)
+        return None
+
+    # Βρες το καλύτερο match βάσει έτους
+    best = results[0]
+    if year:
+        for r in results:
+            rel_year = int((r.get("release_date") or "0-01-01")[:4] or "0")
+            if abs(rel_year - int(year)) <= 1:
+                best = r
+                break
+
+    tmdb_id = best["id"]
+
+    try:
+        r = requests.get(
+            f"{TMDB_BASE}/movie/{tmdb_id}",
+            params={"api_key": TMDB_API_KEY, "append_to_response": "credits", "language": "el"},
+            timeout=10,
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        logger.warning("TMDB details αποτυχία για id=%s: %s", tmdb_id, e)
+        return None
+
+    genres    = [g["name"] for g in data.get("genres", [])]
+    credits   = data.get("credits", {})
+    directors = [c["name"] for c in credits.get("crew", []) if c.get("job") == "Director"]
+    cast      = [c["name"] for c in credits.get("cast", [])[:10]]
+    overview  = data.get("overview", "")
+    vote_avg  = data.get("vote_average")
+    imdb_id   = data.get("imdb_id")
+    imdb_url  = f"https://www.imdb.com/title/{imdb_id}/" if imdb_id else None
+
+    logger.info("TMDB εμπλουτισμός για '%s' (tmdb_id=%s)", title, tmdb_id)
+    return {
+        "tmdb_id":    tmdb_id,
+        "genre":      genres,
+        "director":   directors,
+        "cast":       cast,
+        "description": overview or None,
+        "imdb_score": round(float(vote_avg), 1) if vote_avg else None,
+        "imdb_url":   imdb_url,
+        "imdb_id":    imdb_id,
+    }
 
 
 def run_scrape(scrape_id: str, mode: str = "full", full_rescrape: bool = False) -> None:
