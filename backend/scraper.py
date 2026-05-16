@@ -132,6 +132,68 @@ def _parse_meta_block(text: str) -> dict:
     return result
 
 
+# Γνωστά είδη ταινιών (Athinorama)
+_KNOWN_GENRES = [
+    "Επιστημονικής Φαντασίας", "Ρομαντική Κωμωδία", "Βιογραφικό Δράμα",
+    "Περιπέτεια", "Ντοκιμαντέρ", "Βιογραφικό", "Βιογραφία",
+    "Ψυχολογικό", "Αστυνομική", "Αστυνομικό", "Κωμωδία", "Ρομάντζο",
+    "Ρομαντική", "Φαντασίας", "Ιστορικό", "Ιστορική", "Μυστηρίου",
+    "Animation", "Παιδικό", "Μουσικό", "Μουσική", "Δράσης",
+    "Κοινωνικό", "Θρίλλερ", "Θρίλερ", "Τρόμος", "Τρόμου", "Δράμα",
+]
+# Ελληνικά άρθρα / λέξεις που ξεκινούν πρόταση (δεν είναι ονοματεπώνυμο)
+_GREEK_SENTENCE_STARTERS = {
+    "Μια", "Μία", "Ένας", "Ένα", "Ο", "Η", "Το", "Οι", "Τα", "Τους", "Τις",
+    "Στην", "Στον", "Στο", "Στα", "Στους", "Με", "Όταν", "Αν", "Σε", "Από",
+    "Κατά", "Για", "Προς", "Ως", "Είναι", "Ήταν", "Αυτός", "Αυτή", "Αυτό",
+}
+
+
+def _extract_from_dirty_description(text: str) -> dict:
+    """
+    Ανιχνεύει αν η περιγραφή περιέχει embedded metadata του Athinorama
+    (μορφή: '[title] [genre] [year] Διάρκεια: N΄ [Director] [synopsis]').
+    Αν ναι, εξάγει genre, director και καθαρή description.
+    """
+    result = {"genre": [], "director": [], "description": text}
+
+    # Ψάχνουμε "Διάρκεια: N΄" στις πρώτες 350 χαρακτήρες
+    dur_match = re.search(r"Διάρκεια:\s*\d+\s*[΄΄'']\s*", text[:350])
+    if not dur_match:
+        return result
+
+    prefix = text[:dur_match.start()]
+    after_dur = text[dur_match.end():].strip()
+
+    # Εξαγωγή είδους από το prefix (longest match πρώτα)
+    for genre in sorted(_KNOWN_GENRES, key=len, reverse=True):
+        if genre in prefix:
+            result["genre"] = [genre]
+            break
+
+    # Εξαγωγή σκηνοθέτη: κεφαλαία ονόματα στην αρχή του after_dur
+    words = after_dur.split()
+    skip = 0
+    director_parts = []
+    for i, word in enumerate(words[:6]):
+        clean_word = re.sub(r"[.,;]$", "", word)
+        if clean_word in _GREEK_SENTENCE_STARTERS:
+            break
+        if re.match(r"^[Α-ΩΆΈΉΊΌΎΏA-ZÀ-Ö]", clean_word):
+            director_parts.append(clean_word)
+            skip = i + 1
+        else:
+            break
+
+    if director_parts:
+        result["director"] = [" ".join(director_parts)]
+
+    clean_desc = " ".join(words[skip:]).strip()
+    result["description"] = clean_desc or after_dur
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Discovery URLs ταινιών
 # ---------------------------------------------------------------------------
@@ -367,14 +429,22 @@ def scrape_movie_details(url: str) -> dict | None:
                 description = txt
                 break
 
+    # Αν η περιγραφή περιέχει embedded metadata, εξάγουμε genre/director/clean desc
+    genre: list[str] = []
+    director: list[str] = []
+    extracted = _extract_from_dirty_description(description)
+    genre = extracted["genre"]
+    director = extracted["director"]
+    description = extracted["description"]
+
     return {
         "id": movie_id,
         "title": title,
         "title_original": title_original,
         "year": year,
         "country": country,
-        "genre": [],
-        "director": [],
+        "genre": genre,
+        "director": director,
         "cast": [],
         "stars": stars,
         "duration": duration,
