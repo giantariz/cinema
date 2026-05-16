@@ -83,8 +83,8 @@ def get_movies(filters: dict) -> dict:
     # Φίλτρα που μπορεί να χειριστεί Firestore άμεσα
     year_from = filters.get("year_from")
     year_to = filters.get("year_to")
-    stars_min = filters.get("stars_min")
-    stars_max = filters.get("stars_max")
+    imdb_min = filters.get("imdb_min")
+    imdb_max = filters.get("imdb_max")
     country = filters.get("country")
     genre = filters.get("genre")
     duration_min = filters.get("duration_min")
@@ -94,10 +94,10 @@ def get_movies(filters: dict) -> dict:
         query = query.where("year", ">=", int(year_from))
     if year_to:
         query = query.where("year", "<=", int(year_to))
-    if stars_min:
-        query = query.where("stars", ">=", float(stars_min))
-    if stars_max:
-        query = query.where("stars", "<=", float(stars_max))
+    if imdb_min:
+        query = query.where("imdb_score", ">=", float(imdb_min))
+    if imdb_max:
+        query = query.where("imdb_score", "<=", float(imdb_max))
     if country:
         query = query.where("country", "==", country)
     if duration_min:
