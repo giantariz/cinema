@@ -435,11 +435,13 @@ def scrape_movie_details(url: str) -> dict | None:
     title = _text("h1") or _text("title").split("|")[0].strip()
 
     # Πρωτότυπος τίτλος
+    # Το element μπορεί να περιέχει "Ελληνικός / Original" — κρατάμε μόνο το τελευταίο τμήμα
     title_original = ""
     orig_el = soup.select_one(".original-title")
     if orig_el:
         span = orig_el.select_one("span")
-        title_original = span.get_text(strip=True) if span else orig_el.get_text(strip=True)
+        raw = span.get_text(strip=True) if span else orig_el.get_text(strip=True)
+        title_original = raw.split(" / ")[-1].strip()
 
     # Αστεράκια — από το span μέσα στο .rating-stars
     stars = None
