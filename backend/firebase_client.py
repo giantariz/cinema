@@ -1,6 +1,7 @@
 """
 Firebase Firestore client — αρχικοποίηση και βοηθητικές συναρτήσεις.
 """
+import logging
 import os
 import json
 import math
@@ -8,6 +9,8 @@ import random
 import re
 import unicodedata
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -202,6 +205,60 @@ def clear_movies_collection() -> int:
         batch.commit()
         deleted += len(docs)
     return deleted
+
+
+_URL_CACHE_CHUNK_SIZE = 4000
+_URL_CACHE_MAX_AGE_HOURS = 72
+
+
+def save_url_list_cache(urls: list[str]) -> None:
+    """Αποθηκεύει λίστα URLs στο Firestore σε chunks για resumable batch scraping."""
+    db = _get_db()
+    chunks = [urls[i:i + _URL_CACHE_CHUNK_SIZE] for i in range(0, len(urls), _URL_CACHE_CHUNK_SIZE)]
+    db.collection("scrape_state").document("url_cache_meta").set({
+        "total": len(urls),
+        "chunks": len(chunks),
+        "created_at": _now_iso(),
+    })
+    for i, chunk in enumerate(chunks):
+        db.collection("scrape_state").document(f"url_cache_chunk_{i}").set({
+            "chunk_index": i,
+            "urls": chunk,
+        })
+    logger.info("URL cache αποθηκεύτηκε: %d URLs σε %d chunks", len(urls), len(chunks))
+
+
+def load_url_list_cache() -> list[str] | None:
+    """
+    Φορτώνει cached λίστα URLs από Firestore.
+    Επιστρέφει None αν δεν υπάρχει ή έχει λήξει (>72 ώρες).
+    """
+    db = _get_db()
+    meta_doc = db.collection("scrape_state").document("url_cache_meta").get()
+    if not meta_doc.exists:
+        return None
+
+    meta = meta_doc.to_dict()
+    created_at_str = meta.get("created_at", "")
+    if created_at_str:
+        created_at = datetime.fromisoformat(created_at_str)
+        age_hours = (datetime.now(timezone.utc) - created_at).total_seconds() / 3600
+        if age_hours > _URL_CACHE_MAX_AGE_HOURS:
+            logger.info("URL cache έχει λήξει (%.1fh > %dh) — απαιτείται νέο discovery", age_hours, _URL_CACHE_MAX_AGE_HOURS)
+            return None
+
+    chunks_count = meta.get("chunks", 0)
+    if not chunks_count:
+        return None
+
+    urls = []
+    for i in range(chunks_count):
+        chunk_doc = db.collection("scrape_state").document(f"url_cache_chunk_{i}").get()
+        if chunk_doc.exists:
+            urls.extend(chunk_doc.to_dict().get("urls", []))
+
+    logger.info("URL cache φορτώθηκε: %d URLs", len(urls))
+    return urls if urls else None
 
 
 def get_distinct_countries() -> list[str]:

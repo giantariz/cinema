@@ -19,6 +19,8 @@ from firebase_client import (
     get_movie,
     update_scrape_job,
     clear_movies_collection,
+    save_url_list_cache,
+    load_url_list_cache,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,6 +48,9 @@ TMDB_BASE = "https://api.themoviedb.org/3"
 # Μέγιστος χρόνος επεξεργασίας ανά ταινία (seconds) - αν κολλήσει, την προσπερνά
 MOVIE_SCRAPE_TIMEOUT = 60
 
+# Delay μεταξύ TMDB API κλήσεων για αποφυγή rate limiting (429)
+TMDB_REQUEST_DELAY = 0.2
+
 
 # ---------------------------------------------------------------------------
 # Βοηθητικές
@@ -54,6 +59,26 @@ MOVIE_SCRAPE_TIMEOUT = 60
 def _sleep():
     """Rate limiting: 1-2 δευτερόλεπτα pause."""
     time.sleep(random.uniform(1.0, 2.0))
+
+
+def _tmdb_get(url: str, params: dict) -> requests.Response | None:
+    """TMDB GET με rate-limit handling (429 backoff) και retry."""
+    for attempt in range(3):
+        try:
+            time.sleep(TMDB_REQUEST_DELAY)
+            r = requests.get(url, params=params, timeout=10)
+            if r.status_code == 429:
+                retry_after = int(r.headers.get("Retry-After", 10))
+                logger.warning("TMDB rate limit (429) — αναμονή %ds", retry_after)
+                time.sleep(retry_after)
+                continue
+            r.raise_for_status()
+            return r
+        except requests.RequestException as e:
+            logger.warning("TMDB request αποτυχία (attempt %d/3): %s", attempt + 1, e)
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+    return None
 
 
 def _safe_get(url: str, retries: int = 3) -> requests.Response | None:
@@ -613,13 +638,11 @@ def find_tmdb_data(title: str, original_title: str = "", year: int | None = None
         params = {"api_key": TMDB_API_KEY, "query": query, "language": "el"}
         if year:
             params["year"] = year
-        try:
-            r = requests.get(f"{TMDB_BASE}/search/movie", params=params, timeout=10)
-            r.raise_for_status()
-            return r.json().get("results", [])
-        except Exception as e:
-            logger.warning("TMDB search αποτυχία για '%s': %s", query, e)
+        r = _tmdb_get(f"{TMDB_BASE}/search/movie", params)
+        if r is None:
+            logger.warning("TMDB search αποτυχία για '%s'", query)
             return []
+        return r.json().get("results", [])
 
     results = _search(original_title or title)
     if not results and original_title:
@@ -671,17 +694,14 @@ def find_tmdb_data(title: str, original_title: str = "", year: int | None = None
 
     tmdb_id = best["id"]
 
-    try:
-        r = requests.get(
-            f"{TMDB_BASE}/movie/{tmdb_id}",
-            params={"api_key": TMDB_API_KEY, "append_to_response": "credits,videos", "language": "el"},
-            timeout=10,
-        )
-        r.raise_for_status()
-        data = r.json()
-    except Exception as e:
-        logger.warning("TMDB details αποτυχία για id=%s: %s", tmdb_id, e)
+    r = _tmdb_get(
+        f"{TMDB_BASE}/movie/{tmdb_id}",
+        {"api_key": TMDB_API_KEY, "append_to_response": "credits,videos", "language": "el"},
+    )
+    if r is None:
+        logger.warning("TMDB details αποτυχία για id=%s", tmdb_id)
         return None
+    data = r.json()
 
     logger.info("TMDB εμπλουτισμός για '%s' (tmdb_id=%s)", title, tmdb_id)
     return _parse_tmdb_response(data, tmdb_id)
@@ -784,17 +804,14 @@ def fetch_tmdb_data_by_id(tmdb_id: int) -> dict | None:
     """
     if not TMDB_API_KEY:
         return None
-    try:
-        r = requests.get(
-            f"{TMDB_BASE}/movie/{tmdb_id}",
-            params={"api_key": TMDB_API_KEY, "append_to_response": "credits,videos", "language": "el"},
-            timeout=10,
-        )
-        r.raise_for_status()
-        return _parse_tmdb_response(r.json(), tmdb_id)
-    except Exception as e:
-        logger.warning("TMDB fetch_by_id αποτυχία για id=%s: %s", tmdb_id, e)
+    r = _tmdb_get(
+        f"{TMDB_BASE}/movie/{tmdb_id}",
+        {"api_key": TMDB_API_KEY, "append_to_response": "credits,videos", "language": "el"},
+    )
+    if r is None:
+        logger.warning("TMDB fetch_by_id αποτυχία για id=%s", tmdb_id)
         return None
+    return _parse_tmdb_response(r.json(), tmdb_id)
 
 
 _TMDB_MERGE_FIELDS = (
@@ -867,26 +884,49 @@ def run_scrape(
     )
 
     start_time = time.time()
-    urls_seen = set()
-    skipped_offset = 0
-    processed_in_batch = 0
     done = 0
     errors = 0
     total_found = 0
+    processed_in_batch = 0
 
     try:
-        for movie_url in discover_movie_urls(mode):
-            if movie_url in urls_seen:
-                continue
-            urls_seen.add(movie_url)
-            total_found += 1
+        # --- Φάση 1: Discovery (ή φόρτωση από Firestore cache) ---
+        if mode == "full":
+            all_urls = None
 
-            # Παράλειψη των πρώτων `offset` ταινιών
-            if skipped_offset < offset:
-                skipped_offset += 1
-                continue
+            if offset > 0:
+                # Σε συνέχεια batch: φόρτωση από cache αντί για νέο discovery
+                all_urls = load_url_list_cache()
+                if all_urls:
+                    logger.info("Φόρτωση %d URLs από Firestore cache (offset=%d)", len(all_urls), offset)
+                else:
+                    logger.warning("URL cache δεν βρέθηκε ή έχει λήξει — εκ νέου discovery")
 
-            # Σταμάτημα μόλις συμπληρωθεί το batch
+            if all_urls is None:
+                update_scrape_job(scrape_id, {"status": "discovering", "done": 0, "errors": 0})
+                logger.info("Discovery ταινιών (full mode)...")
+                all_urls = list(dict.fromkeys(discover_movie_urls("full")))
+                save_url_list_cache(all_urls)
+                logger.info("Discovery ολοκληρώθηκε: %d μοναδικά URLs αποθηκεύτηκαν στο Firestore", len(all_urls))
+        else:
+            # Incremental: γρήγορο discovery μόνο 2 τελευταίων μηνών
+            all_urls = list(dict.fromkeys(discover_movie_urls("incremental")))
+            logger.info("Incremental discovery: %d URLs", len(all_urls))
+
+        total_found = len(all_urls)
+        urls_to_process = all_urls[offset:]
+
+        update_scrape_job(scrape_id, {
+            "status": "running",
+            "total": total_found,
+            "done": done,
+            "errors": errors,
+            "offset": offset,
+            "batch_size": batch_size,
+        })
+
+        # --- Φάση 2: Scraping ---
+        for movie_url in urls_to_process:
             if batch_size and processed_in_batch >= batch_size:
                 break
 
