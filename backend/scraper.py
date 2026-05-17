@@ -143,7 +143,18 @@ def _parse_duration(text: str) -> int | None:
 
 
 def _extract_id_from_url(url: str) -> str | None:
-    """Εξαγωγή Athinorama movie ID από το URL."""
+    """Εξαγωγή Athinorama movie ID από παλιό ή νέο URL."""
+    # Παλαιά κριτική: /cinema/cinema-reviews/3071781/3071781-title/
+    m = re.search(r"/cinema/cinema-reviews/(\d+)(?:[/?#]|$)", url)
+    if m:
+        return m.group(1)
+
+    # Νέο movie archive: /cinema/movie/i_epeteios-10087672/
+    m = re.search(r"/cinema/movie/[^/?#]*-(\d+)(?:[/?#]|$)", url)
+    if m:
+        return m.group(1)
+
+    # Fallback για ιστορικά variants που τελειώνουν σε αριθμητικό segment.
     m = re.search(r"/(\d+)(?:[/?#]|$)", url)
     if m:
         return m.group(1)
@@ -178,9 +189,128 @@ def _parse_meta_block(text: str) -> dict:
     return result
 
 
+
+def _page_text_lines(soup: BeautifulSoup) -> list[str]:
+    """Επιστρέφει καθαρές, μη κενές γραμμές κειμένου από τη σελίδα."""
+    lines: list[str] = []
+    for line in soup.get_text("\n", strip=True).splitlines():
+        clean = re.sub(r"\s+", " ", line).strip()
+        if clean:
+            lines.append(clean)
+    return lines
+
+
+def _is_rating_line(text: str) -> bool:
+    """True αν η γραμμή μοιάζει με βαθμολογία Athinorama 0,5–5."""
+    return bool(re.fullmatch(r"[0-5](?:[,.]5)?", text.strip()))
+
+
+def _extract_structured_text_fields(soup: BeautifulSoup, title: str = "") -> dict:
+    """
+    Fallback parser για το νέο markup του Athinorama, όπου τα βασικά στοιχεία
+    εμφανίζονται ως απλές διαδοχικές γραμμές κειμένου αντί για παλιά CSS blocks.
+    """
+    lines = _page_text_lines(soup)
+    data = {
+        "title_original": "",
+        "year": None,
+        "duration": None,
+        "stars": None,
+        "genre": [],
+        "country": "",
+        "director": [],
+        "cast": [],
+        "description": "",
+    }
+
+    try:
+        start = lines.index(title) if title else next(
+            i for i, line in enumerate(lines) if line.startswith("# ")
+        )
+    except (ValueError, StopIteration):
+        start = 0
+
+    window = lines[start + 1:start + 30]
+
+    # Πρωτότυπος τίτλος: συνήθως η πρώτη μη metadata γραμμή μετά τον ελληνικό τίτλο.
+    metadata_markers = ("Έγχρ", "Α/Μ", "Διάρκεια", "Σκηνοθεσία", "Με τους")
+    for line in window[:8]:
+        if (
+            re.fullmatch(r"(19|20)\d{2}", line)
+            or _is_rating_line(line)
+            or line.startswith(metadata_markers)
+        ):
+            break
+        if line not in _KNOWN_GENRES and len(line) <= 120:
+            data["title_original"] = line
+            break
+
+    for i, line in enumerate(window):
+        if data["year"] is None:
+            m = re.search(r"\b(19|20)\d{2}\b", line)
+            if m:
+                data["year"] = int(m.group())
+        if data["duration"] is None and "Διάρκεια" in line:
+            data["duration"] = _parse_duration(line)
+        if data["stars"] is None and _is_rating_line(line):
+            data["stars"] = _parse_stars(line)
+
+        if line.startswith("Σκηνοθεσία"):
+            for candidate in window[i + 1:i + 4]:
+                if candidate and not candidate.startswith("Με τους"):
+                    data["director"] = [candidate]
+                    break
+
+        if line.startswith("Με τους"):
+            cast: list[str] = []
+            for candidate in window[i + 1:i + 8]:
+                if candidate.startswith(("Αναλυτική", "Η γνώμη", "Πού παίζεται", "Σκηνοθεσία")):
+                    break
+                if len(candidate) <= 80 and not _is_rating_line(candidate):
+                    cast.append(candidate)
+            data["cast"] = cast
+
+    # Genre/country/description: στις movie pages έρχονται αμέσως μετά τη βαθμολογία.
+    rating_index = next((i for i, line in enumerate(window) if _is_rating_line(line)), None)
+    if rating_index is not None:
+        after_rating = window[rating_index + 1:]
+        for line in after_rating[:8]:
+            if line in _KNOWN_GENRES or any(g.lower() == line.lower() for g in _KNOWN_GENRES):
+                data["genre"] = [line]
+                continue
+            if (
+                not data["country"]
+                and len(line) <= 60
+                and not line.startswith(("Σκηνοθεσία", "Με τους", "Αναλυτική"))
+                and not _is_rating_line(line)
+                and not re.search(r"Διάρκεια|Έγχρ|Α/Μ|^(19|20)\d{2}$", line)
+                and len(line.split()) <= 4
+            ):
+                data["country"] = line
+                continue
+            if len(line) > 50:
+                data["description"] = line
+                break
+
+    # Review pages: metadata βρίσκεται συχνά σε γραμμή "Χώρα. Έτος. Διάρκεια..." μετά τα paragraphs.
+    for line in lines[start:start + 80]:
+        if "Διάρκεια" in line and re.search(r"\b(19|20)\d{2}\b", line):
+            meta = _parse_meta_block(line)
+            data["year"] = data["year"] or meta["year"]
+            data["duration"] = data["duration"] or meta["duration"]
+            data["country"] = data["country"] or meta["country"]
+            break
+
+    return data
+
+
 # Γνωστά είδη ταινιών (Athinorama)
 _KNOWN_GENRES = [
     "Επιστημονικής Φαντασίας", "Ρομαντική Κωμωδία", "Βιογραφικό Δράμα",
+    "Δραματική", "Δραματικές", "Δραματική κομεντί", "Κομεντί",
+    "Κωμωδίες", "Περιπέτειες", "Πολεμική", "Πολεμικές",
+    "Μουσικό Ντοκιμαντέρ", "Μουσικό", "Σινεφίλ", "Κλασικές",
+    "Αστυνομικές", "Βιογραφικές", "Οικογενειακές", "Μιούζικαλ",
     "Περιπέτεια", "Ντοκιμαντέρ", "Βιογραφικό", "Βιογραφία",
     "Ψυχολογικό", "Αστυνομική", "Αστυνομικό", "Κωμωδία", "Ρομάντζο",
     "Ρομαντική", "Φαντασίας", "Ιστορικό", "Ιστορική", "Μυστηρίου",
@@ -287,40 +417,41 @@ def discover_movie_urls(mode: str = "full") -> Generator[str, None, None]:
         yield from _discover_full()
 
 
+def _normalize_athinorama_url(href: str) -> str:
+    """Μετατρέπει relative Athinorama href σε canonical URL χωρίς query/fragment."""
+    href = href.strip()
+    full_url = href if href.startswith("http") else BASE_URL + href
+    return full_url.split("#", 1)[0].split("?", 1)[0]
+
+
+def _is_athinorama_movie_url(url: str) -> bool:
+    """Αναγνωρίζει παλιά review URLs και νέα movie archive URLs."""
+    patterns = (
+        r"/cinema/cinema-reviews/\d+(?:/|$)",
+        r"/cinema/movie/[^/?#]+-\d+(?:/|$)",
+        r"/cinema/movies/\d+(?:/|$)",
+        r"/cinema/\w+-reviews/\d+(?:/|$)",
+    )
+    return any(re.search(pattern, url) for pattern in patterns)
+
+
 def _extract_movie_links(soup: BeautifulSoup) -> list[str]:
     """Εξάγει μοναδικά URLs ταινιών από μια σελίδα λίστας."""
-    seen = set()
-    results = []
-    for a in soup.select("a[href*='/cinema/cinema-reviews/']"):
-        href = a.get("href", "")
-        if not href:
-            continue
-        full_url = href if href.startswith("http") else BASE_URL + href
-        if re.search(r"/cinema-reviews/\d+/", full_url) and full_url not in seen:
-            seen.add(full_url)
-            results.append(full_url)
-    return results
+    return _extract_movie_links_flexible(soup)
 
 
 def _extract_movie_links_flexible(soup: BeautifulSoup) -> list[str]:
     """Εξάγει URLs ταινιών από moviearchive ή cinema-reviews σελίδες."""
     seen = set()
     results = []
-    patterns = [
-        r"/cinema/cinema-reviews/\d+",
-        r"/cinema/movies/\d+",
-        r"/cinema/\w+-reviews/\d+",
-    ]
     for a in soup.find_all("a", href=True):
         href = a.get("href", "")
         if not href:
             continue
-        full_url = href if href.startswith("http") else BASE_URL + href
-        for pattern in patterns:
-            if re.search(pattern, full_url) and full_url not in seen:
-                seen.add(full_url)
-                results.append(full_url)
-                break
+        full_url = _normalize_athinorama_url(href)
+        if _is_athinorama_movie_url(full_url) and full_url not in seen:
+            seen.add(full_url)
+            results.append(full_url)
     return results
 
 
@@ -522,13 +653,27 @@ def scrape_movie_details(url: str) -> dict | None:
                 description = txt
                 break
 
+    # Fallback για το νέο markup του Athinorama (movie archive pages).
+    structured = _extract_structured_text_fields(soup, title)
+    if not title_original and structured.get("title_original"):
+        title_original = structured["title_original"]
+    if year is None and structured.get("year"):
+        year = structured["year"]
+    if duration is None and structured.get("duration"):
+        duration = structured["duration"]
+    if stars is None and structured.get("stars") is not None:
+        stars = structured["stars"]
+    if not country and structured.get("country"):
+        country = structured["country"]
+    if not description and structured.get("description"):
+        description = structured["description"]
+
     # Αν η περιγραφή περιέχει embedded metadata, εξάγουμε genre/director/clean desc
-    genre: list[str] = []
-    director: list[str] = []
     extracted = _extract_from_dirty_description(description)
-    genre = extracted["genre"]
-    director = extracted["director"]
+    genre: list[str] = extracted["genre"] or structured.get("genre", [])
+    director: list[str] = extracted["director"] or structured.get("director", [])
     description = extracted["description"]
+    cast: list[str] = structured.get("cast", [])
 
     return {
         "id": movie_id,
@@ -538,7 +683,7 @@ def scrape_movie_details(url: str) -> dict | None:
         "country": country,
         "genre": genre,
         "director": director,
-        "cast": [],
+        "cast": cast,
         "stars": stars,
         "duration": duration,
         "poster_url": poster_url,
@@ -1136,6 +1281,7 @@ def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
     urls_seen = set()
     stopped_by_user = False
 
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     try:
         for movie_url in discover_movie_urls("full"):
             if movie_url in urls_seen:
@@ -1177,17 +1323,18 @@ def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
             })
 
             try:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(_scrape_and_enrich, movie_url)
-                    try:
-                        data = future.result(timeout=MOVIE_SCRAPE_TIMEOUT)
-                    except concurrent.futures.TimeoutError:
-                        errors += 1
-                        logger.warning(
-                            "⏱ Timeout (%ds) για %s - προσπέρασμα",
-                            MOVIE_SCRAPE_TIMEOUT, movie_url,
-                        )
-                        continue
+                future = executor.submit(_scrape_and_enrich, movie_url)
+                try:
+                    data = future.result(timeout=MOVIE_SCRAPE_TIMEOUT)
+                except concurrent.futures.TimeoutError:
+                    errors += 1
+                    logger.warning(
+                        "⏱ Timeout (%ds) για %s - προσπέρασμα",
+                        MOVIE_SCRAPE_TIMEOUT, movie_url,
+                    )
+                    executor.shutdown(wait=False)
+                    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                    continue
                 if data:
                     save_movie(data)
                     done += 1
@@ -1210,8 +1357,11 @@ def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
             "duration_seconds": int(elapsed),
             "duration_formatted": _format_duration(elapsed),
         })
+        executor.shutdown(wait=False)
         _clear_scrape_control(scrape_id)
         return
+
+    executor.shutdown(wait=False)
 
     elapsed = time.time() - start_time
     duration_fmt = _format_duration(elapsed)
