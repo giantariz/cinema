@@ -214,8 +214,8 @@ async function loadMovies() {
   if (f.q)        params.set('q', f.q);
   if (f.yearFrom) params.set('year_from', f.yearFrom);
   if (f.yearTo)   params.set('year_to', f.yearTo);
-  if (f.imdbMin) params.set('imdb_min', f.imdbMin);
-  if (f.imdbMax) params.set('imdb_max', f.imdbMax);
+  if (f.tmdbMin) params.set('tmdb_min', f.tmdbMin);
+  if (f.tmdbMax) params.set('tmdb_max', f.tmdbMax);
   if (f.country)  params.set('country', f.country);
   if (f.genre)    params.set('genre', f.genre);
   if (f.durMin)   params.set('duration_min', f.durMin);
@@ -396,11 +396,10 @@ function _updateModalFields(movie) {
   const ratingsEl = document.getElementById('modalRatings');
   let ratingsHtml = '';
   if (movie.imdb_score) {
-    const votes = movie.vote_count ? ` · ${(movie.vote_count / 1000).toFixed(0)}K ψήφοι` : '';
     ratingsHtml = `<div class="modal-rating-tmdb">
       <span class="modal-rating-tmdb-score">${movie.imdb_score}</span>
       <span class="modal-rating-tmdb-max">/10</span>
-      <span class="modal-rating-tmdb-label">TMDB${votes}</span>
+      <span class="modal-rating-tmdb-label">TMDB</span>
     </div>`;
   }
   ratingsEl.innerHTML = ratingsHtml;
@@ -847,8 +846,8 @@ function addFilterListener(id, key) {
 }
 addFilterListener('yearFrom',     'yearFrom');
 addFilterListener('yearTo',       'yearTo');
-addFilterListener('imdbMin',      'imdbMin');
-addFilterListener('imdbMax',      'imdbMax');
+addFilterListener('tmdbMin',      'tmdbMin');
+addFilterListener('tmdbMax',      'tmdbMax');
 addFilterListener('countrySelect','country');
 addFilterListener('genreSelect',  'genre');
 addFilterListener('durMin',       'durMin');
@@ -884,7 +883,7 @@ document.getElementById('randomBtn').addEventListener('click', loadRandom);
 document.getElementById('clearFiltersBtn').addEventListener('click', () => {
   state.filters = {};
   state.page = 1;
-  ['searchInput','yearFrom','yearTo','imdbMin','imdbMax','durMin','durMax'].forEach(id => {
+  ['searchInput','yearFrom','yearTo','tmdbMin','tmdbMax','durMin','durMax'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
