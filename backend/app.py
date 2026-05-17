@@ -283,8 +283,8 @@ def enrich_movie(movie_id: str):
                 update[field] = tmdb_data[field]
 
         # Ειδικές περιπτώσεις: πεδία με διαφορετικό όνομα μεταξύ Athinorama / TMDB
-        if tmdb_data.get("original_title") and not movie.get("title_original"):
-            update["title_original"] = tmdb_data["original_title"]
+        # title_original δεν ενημερώνεται από TMDB — μόνο από Athinorama scraping
+        # (TMDB μπορεί να επιστρέψει λανθασμένη ταινία και να αλλοιώσει τον τίτλο)
         if tmdb_data.get("year") and not movie.get("year"):
             update["year"] = tmdb_data["year"]
 
@@ -413,10 +413,17 @@ def scrape_stop():
 @app.post("/api/admin/clear-database")
 @require_scrape_key
 def clear_database():
-    """Διαγραφή ΟΛΗΣ της βάσης ταινιών."""
-    count = db.clear_movies_collection()
-    logger.info("Διαγραφή βάσης: %d ταινίες διαγράφηκαν", count)
-    return jsonify({"status": "cleared", "deleted": count}), 200
+    """Διαγραφή ΟΛΗΣ της βάσης ταινιών (σε background thread για αποφυγή timeout)."""
+    def _do_clear():
+        try:
+            count = db.clear_movies_collection()
+            logger.info("Διαγραφή βάσης: %d ταινίες διαγράφηκαν", count)
+        except Exception as exc:
+            logger.error("Σφάλμα κατά τη διαγραφή βάσης: %s", exc)
+
+    t = threading.Thread(target=_do_clear, daemon=True)
+    t.start()
+    return jsonify({"status": "clearing"}), 202
 
 
 @app.get("/api/scrape/status")

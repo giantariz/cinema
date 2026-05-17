@@ -844,8 +844,7 @@ def _apply_tmdb_to_movie(movie_data: dict, tmdb_data: dict) -> None:
     for field in _TMDB_MERGE_FIELDS:
         if tmdb_data.get(field) and not movie_data.get(field):
             movie_data[field] = tmdb_data[field]
-    if tmdb_data.get("original_title") and not movie_data.get("title_original"):
-        movie_data["title_original"] = tmdb_data["original_title"]
+    # title_original δεν ενημερώνεται από TMDB — μόνο από Athinorama scraping
     if tmdb_data.get("year") and not movie_data.get("year"):
         movie_data["year"] = tmdb_data["year"]
     movie_data["tmdb_enriched_at"] = datetime.now(timezone.utc).isoformat()
