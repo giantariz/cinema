@@ -19,6 +19,8 @@ const state = {
   scrapeInterval: null,
   timerInterval: null,
   scrapeStartTime: null,
+  stopRequested: false,
+  pauseRequested: false,
   batchSize: null,
   nextOffset: 0,
   currentMovie: null,
@@ -386,10 +388,6 @@ function _updateModalFields(movie) {
   const genre    = Array.isArray(movie.genre)    ? movie.genre.join(', ')    : (movie.genre || '');
   const director = Array.isArray(movie.director) ? movie.director.join(', ') : (movie.director || '');
   const dur      = movie.duration ? `${formatDuration(movie.duration)} (${movie.duration} λεπτά)` : null;
-
-  // Original title (ενημέρωση και μετά από enrichment)
-  const origEl = document.getElementById('modalOriginal');
-  if (movie.title_original) origEl.textContent = movie.title_original;
 
   // Backdrop hero
   const backdrop = document.getElementById('modalBackdrop');
@@ -790,9 +788,11 @@ document.getElementById('pauseScrapeBtn').addEventListener('click', async () => 
       method: 'POST',
       body: JSON.stringify({ api_key: key, scrape_id: state.scrapeId }),
     });
+    state.pauseRequested = true;
+    state.stopRequested  = false;
     document.getElementById('pauseScrapeBtn').style.display = 'none';
     document.getElementById('resumeScrapeBtn').style.display = '';
-    setAdminStatus('⏸ Σε παύση…', 'info');
+    setAdminStatus('⏸ Αναμονή παύσης (τελειώνει η τρέχουσα ταινία)…', 'info');
   } catch (e) {
     toast('Σφάλμα παύσης: ' + e.message, 'error');
   }
@@ -806,9 +806,10 @@ document.getElementById('resumeScrapeBtn').addEventListener('click', async () =>
       method: 'POST',
       body: JSON.stringify({ api_key: key, scrape_id: state.scrapeId }),
     });
+    state.pauseRequested = false;
     document.getElementById('resumeScrapeBtn').style.display = 'none';
     document.getElementById('pauseScrapeBtn').style.display = '';
-    setAdminStatus('Συνέχεια scraping…', 'info');
+    setAdminStatus('▶ Συνέχεια scraping…', 'info');
   } catch (e) {
     toast('Σφάλμα συνέχισης: ' + e.message, 'error');
   }
@@ -823,7 +824,9 @@ document.getElementById('stopScrapeBtn').addEventListener('click', async () => {
       method: 'POST',
       body: JSON.stringify({ api_key: key, scrape_id: state.scrapeId }),
     });
-    setAdminStatus('Διακοπή scraping…', 'info');
+    state.stopRequested  = true;
+    state.pauseRequested = false;
+    setAdminStatus('⏹ Αναμονή διακοπής (τελειώνει η τρέχουσα ταινία)…', 'info');
   } catch (e) {
     toast('Σφάλμα διακοπής: ' + e.message, 'error');
   }
@@ -856,12 +859,12 @@ document.getElementById('clearDbBtn').addEventListener('click', async () => {
   if (!confirm('⚠ ΠΡΟΣΟΧΗ!\n\nΘα διαγραφεί ΟΛΟΚΛΗΡΗ η βάση ταινιών.\nΑυτή η ενέργεια δεν αναστρέφεται!\n\nΣυνέχεια;')) return;
   if (!confirm('Είσαι σίγουρος; Όλες οι ταινίες θα διαγραφούν οριστικά.')) return;
   try {
-    const res = await api('/api/admin/clear-database', {
+    await api('/api/admin/clear-database', {
       method: 'POST',
       body: JSON.stringify({ api_key: key }),
     });
-    toast(`Βάση διαγράφηκε: ${res.deleted} ταινίες αφαιρέθηκαν.`, 'success');
-    loadTotalCount();
+    toast('Διαγραφή βάσης ξεκίνησε στο background. Σε λίγο η βάση θα είναι άδεια.', 'success');
+    setTimeout(loadTotalCount, 5000);
   } catch (e) {
     toast('Σφάλμα διαγραφής: ' + e.message, 'error');
   }
@@ -910,12 +913,14 @@ function updateScrapeUI(job) {
   const durationLabel = job.duration_formatted ? ` — Διάρκεια: ${job.duration_formatted}` : '';
 
   if (job.status === 'completed') {
+    state.stopRequested = state.pauseRequested = false;
     setAdminStatus(`✓ Ολοκληρώθηκε: ${job.done} ταινίες αποθηκεύτηκαν${durationLabel}.`, 'success');
     document.getElementById('nextBatchRow').style.display = 'none';
     stopScrapePolling();
     stopTimer();
     _setScrapeActive(false);
   } else if (job.status === 'batch_completed') {
+    state.stopRequested = state.pauseRequested = false;
     state.nextOffset = job.next_offset || 0;
     state.batchSize  = job.batch_size  || state.batchSize;
     const batchNum = job.batch_size ? Math.floor((job.offset || 0) / job.batch_size) + 1 : '?';
@@ -928,25 +933,35 @@ function updateScrapeUI(job) {
     stopTimer();
     _setScrapeActive(false);
   } else if (job.status === 'stopped') {
+    state.stopRequested = state.pauseRequested = false;
     setAdminStatus(`⏹ Διακόπηκε: ${job.done} ταινίες αποθηκεύτηκαν${durationLabel}.`, 'info');
     document.getElementById('nextBatchRow').style.display = 'none';
     stopScrapePolling();
     stopTimer();
     _setScrapeActive(false);
   } else if (job.status === 'error') {
+    state.stopRequested = state.pauseRequested = false;
     setAdminStatus(`✗ Σφάλμα: ${job.error_message || 'Άγνωστο'}${durationLabel}`, 'error');
     document.getElementById('nextBatchRow').style.display = 'none';
     stopScrapePolling();
     stopTimer();
     _setScrapeActive(false);
   } else if (job.status === 'paused') {
+    state.pauseRequested = false;
     document.getElementById('pauseScrapeBtn').style.display = 'none';
     document.getElementById('resumeScrapeBtn').style.display = '';
     setAdminStatus(`⏸ Σε παύση — ${job.done} / ${job.total} ταινίες${durationLabel}`, 'info');
     document.getElementById('nextBatchRow').style.display = 'none';
   } else {
-    setAdminStatus(`Σε εξέλιξη… (${pct}%)`, 'info');
-    document.getElementById('pauseScrapeBtn').style.display = '';
+    // job.status === 'running'
+    if (state.stopRequested) {
+      setAdminStatus('⏹ Αναμονή διακοπής (τελειώνει η τρέχουσα ταινία)…', 'info');
+    } else if (state.pauseRequested) {
+      setAdminStatus('⏸ Αναμονή παύσης (τελειώνει η τρέχουσα ταινία)…', 'info');
+    } else {
+      setAdminStatus(`Σε εξέλιξη… (${pct}%)`, 'info');
+    }
+    document.getElementById('pauseScrapeBtn').style.display = state.stopRequested ? 'none' : '';
     document.getElementById('resumeScrapeBtn').style.display = 'none';
     document.getElementById('nextBatchRow').style.display = 'none';
   }
