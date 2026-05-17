@@ -108,7 +108,7 @@ def get_movies(filters: dict) -> dict:
     # Ταξινόμηση
     sort_by = filters.get("sort_by", "year")
     sort_dir = filters.get("sort_dir", "desc")
-    valid_sorts = {"year", "stars", "title", "duration"}
+    valid_sorts = {"year", "imdb_score", "title", "duration"}
     if sort_by not in valid_sorts:
         sort_by = "year"
     direction = firestore.Query.DESCENDING if sort_dir == "desc" else firestore.Query.ASCENDING

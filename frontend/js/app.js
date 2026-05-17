@@ -169,7 +169,11 @@ function renderMovieCard(movie, isUserMovie = false, index = -1) {
     <div class="card-body">
       <div class="card-title">${escHtml(movie.title)}</div>
       ${originalTitle ? `<div class="card-original">${escHtml(originalTitle)}</div>` : ''}
-      ${movie.stars ? `
+      ${movie.imdb_score ? `
+        <div class="card-tmdb-score">
+          <span class="card-tmdb-score-value">${movie.imdb_score}</span>
+          <span class="card-tmdb-score-label">TMDB</span>
+        </div>` : movie.stars ? `
         <div class="card-stars">
           <span class="stars-display">${renderStars(movie.stars)}</span>
           <span class="stars-number">${movie.stars}</span>
