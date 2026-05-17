@@ -5,6 +5,7 @@ import logging
 import os
 import threading
 import uuid
+from datetime import datetime, timezone
 from functools import wraps
 
 from flask import Flask, jsonify, request, abort
@@ -230,7 +231,9 @@ _ENRICH_FIELDS = (
     "tmdb_trailer_key",
 )
 # Πεδία που θεωρούνται "νέα" — αν λείπουν από ταινίες με tmdb_id, κάνουμε re-fetch
-_NEW_FIELDS = ("backdrop_path", "cast_roles", "tagline", "vote_count", "production_companies", "original_language", "imdb_score", "imdb_url")
+# Αν λείπει tmdb_enriched_at σημαίνει ότι το enrichment δεν έχει τρέξει ή τρέξει πριν
+# προστεθούν τα νέα πεδία (backdrop, cast_roles κ.λπ.). Επιτρέπει ακριβώς ένα re-fetch.
+_NEW_FIELDS = ("tmdb_enriched_at",)
 
 
 @app.get("/api/movies/<movie_id>/enrich")
@@ -246,7 +249,7 @@ def enrich_movie(movie_id: str):
 
         # Αν έχει tmdb_id ΚΑΙ όλα τα νέα πεδία → τίποτα να κάνουμε
         if existing_tmdb_id and not missing_new:
-            return jsonify(movie), 200
+            return jsonify({**movie, "enriched": False}), 200
 
         # Αν έχει tmdb_id αλλά λείπουν νέα πεδία → fetch απευθείας με ID (χωρίς search)
         # Επαλήθευση ότι το αποθηκευμένο tmdb_id ανήκει όντως στη σωστή ταινία.
@@ -278,6 +281,15 @@ def enrich_movie(movie_id: str):
         for field in _ENRICH_FIELDS:
             if tmdb_data.get(field) and not movie.get(field):
                 update[field] = tmdb_data[field]
+
+        # Ειδικές περιπτώσεις: πεδία με διαφορετικό όνομα μεταξύ Athinorama / TMDB
+        if tmdb_data.get("original_title") and not movie.get("title_original"):
+            update["title_original"] = tmdb_data["original_title"]
+        if tmdb_data.get("year") and not movie.get("year"):
+            update["year"] = tmdb_data["year"]
+
+        # Σφραγίδα χρόνου: σήμα ότι το enrichment ολοκληρώθηκε (ακόμα και αν κάποια πεδία είναι κενά)
+        update["tmdb_enriched_at"] = datetime.now(timezone.utc).isoformat()
 
         db.save_movie_tmdb_data(movie_id, update)
         movie.update(update)
