@@ -434,10 +434,24 @@ def scrape_movie_details(url: str) -> dict | None:
     # Τίτλος — πρώτο h1 της σελίδας
     title = _text("h1") or _text("title").split("|")[0].strip()
 
-    # Πρωτότυπος τίτλος
-    # Το element μπορεί να περιέχει "Ελληνικός / Original" — κρατάμε μόνο το τελευταίο τμήμα
+    # Πρωτότυπος τίτλος — scoped στο κύριο περιεχόμενο για να αποφύγουμε sidebars
+    # που μπορεί να εμφανίζουν .original-title άλλης ταινίας πριν το main article
     title_original = ""
-    orig_el = soup.select_one(".original-title")
+    orig_el = soup.select_one(
+        "article .original-title, "
+        ".review-body .original-title, "
+        ".page-content .original-title, "
+        ".content .original-title, "
+        "main .original-title, "
+        ".item-detail .original-title, "
+        ".movie-detail .original-title"
+    )
+    if orig_el is None:
+        # Fallback: μόνο αν το .original-title είναι direct child ή πολύ κοντά στο h1
+        h1 = soup.find("h1")
+        if h1:
+            orig_el = h1.find_next_sibling(class_="original-title") or \
+                      h1.find_parent().find(class_="original-title") if h1.find_parent() else None
     if orig_el:
         span = orig_el.select_one("span")
         raw = span.get_text(strip=True) if span else orig_el.get_text(strip=True)
