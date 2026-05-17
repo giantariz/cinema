@@ -25,6 +25,22 @@ from firebase_client import (
 
 logger = logging.getLogger(__name__)
 
+# Pause/stop control: {scrape_id: 'running'|'paused'|'stopped'}
+_scrape_controls: dict = {}
+
+
+def set_scrape_control(scrape_id: str, control: str) -> None:
+    _scrape_controls[scrape_id] = control
+
+
+def get_scrape_control(scrape_id: str) -> str:
+    return _scrape_controls.get(scrape_id, "running")
+
+
+def _clear_scrape_control(scrape_id: str) -> None:
+    _scrape_controls.pop(scrape_id, None)
+
+
 BASE_URL = "https://www.athinorama.gr"
 ARCHIVE_URL = f"{BASE_URL}/cinema/cinema-reviews/"
 MOVIEARCHIVE_URL = f"{BASE_URL}/cinema/moviearchive/"
@@ -883,6 +899,7 @@ def run_scrape(
         scrape_id, mode, full_rescrape, batch_size, offset,
     )
 
+    set_scrape_control(scrape_id, "running")
     start_time = time.time()
     done = 0
     errors = 0
@@ -926,9 +943,35 @@ def run_scrape(
         })
 
         # --- Φάση 2: Scraping ---
+        stopped_by_user = False
         for movie_url in urls_to_process:
             if batch_size and processed_in_batch >= batch_size:
                 break
+
+            # Έλεγχος pause/stop
+            ctrl = get_scrape_control(scrape_id)
+            if ctrl == "stopped":
+                stopped_by_user = True
+                break
+            if ctrl == "paused":
+                elapsed_paused = time.time() - start_time
+                update_scrape_job(scrape_id, {
+                    "status": "paused",
+                    "total": total_found,
+                    "done": done,
+                    "errors": errors,
+                    "offset": offset,
+                    "batch_size": batch_size,
+                    "duration_seconds": int(elapsed_paused),
+                    "duration_formatted": _format_duration(elapsed_paused),
+                })
+                while get_scrape_control(scrape_id) == "paused":
+                    time.sleep(2)
+                ctrl = get_scrape_control(scrape_id)
+                if ctrl == "stopped":
+                    stopped_by_user = True
+                    break
+                update_scrape_job(scrape_id, {"status": "running"})
 
             update_scrape_job(scrape_id, {
                 "total": total_found,
@@ -986,15 +1029,20 @@ def run_scrape(
             "duration_seconds": int(elapsed),
             "duration_formatted": _format_duration(elapsed),
         })
+        _clear_scrape_control(scrape_id)
         return
 
     elapsed = time.time() - start_time
     duration_fmt = _format_duration(elapsed)
 
-    # Αν τελείωσε λόγω batch limit → batch_completed, αλλιώς completed
-    batch_hit_limit = batch_size and processed_in_batch >= batch_size
-    final_status = "batch_completed" if batch_hit_limit else "completed"
-    next_offset = (offset + batch_size) if batch_hit_limit else None
+    if stopped_by_user:
+        final_status = "stopped"
+        next_offset = offset + processed_in_batch
+    else:
+        # Αν τελείωσε λόγω batch limit → batch_completed, αλλιώς completed
+        batch_hit_limit = batch_size and processed_in_batch >= batch_size
+        final_status = "batch_completed" if batch_hit_limit else "completed"
+        next_offset = (offset + batch_size) if batch_hit_limit else None
 
     update_scrape_job(scrape_id, {
         "status": final_status,
@@ -1007,6 +1055,7 @@ def run_scrape(
         "duration_seconds": int(elapsed),
         "duration_formatted": duration_fmt,
     })
+    _clear_scrape_control(scrape_id)
     logger.info(
         "Ολοκλήρωση scraping [%s] status=%s: %d/%d ταινίες, %d σφάλματα, next_offset=%s, διάρκεια=%s",
         scrape_id, final_status, done, total_found, errors, next_offset, duration_fmt,
@@ -1020,6 +1069,7 @@ def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
     """
     logger.info("Test scraping [%s]: καθαρισμός βάσης + %d ταινίες", scrape_id, limit)
 
+    set_scrape_control(scrape_id, "running")
     start_time = time.time()
     update_scrape_job(scrape_id, {"status": "running", "total": limit, "done": 0, "errors": 0})
 
@@ -1029,6 +1079,7 @@ def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
     done = 0
     errors = 0
     urls_seen = set()
+    stopped_by_user = False
 
     try:
         for movie_url in discover_movie_urls("full"):
@@ -1038,6 +1089,29 @@ def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
 
             if done >= limit:
                 break
+
+            # Έλεγχος pause/stop
+            ctrl = get_scrape_control(scrape_id)
+            if ctrl == "stopped":
+                stopped_by_user = True
+                break
+            if ctrl == "paused":
+                elapsed_paused = time.time() - start_time
+                update_scrape_job(scrape_id, {
+                    "status": "paused",
+                    "total": limit,
+                    "done": done,
+                    "errors": errors,
+                    "duration_seconds": int(elapsed_paused),
+                    "duration_formatted": _format_duration(elapsed_paused),
+                })
+                while get_scrape_control(scrape_id) == "paused":
+                    time.sleep(2)
+                ctrl = get_scrape_control(scrape_id)
+                if ctrl == "stopped":
+                    stopped_by_user = True
+                    break
+                update_scrape_job(scrape_id, {"status": "running"})
 
             update_scrape_job(scrape_id, {
                 "total": limit,
@@ -1081,20 +1155,23 @@ def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
             "duration_seconds": int(elapsed),
             "duration_formatted": _format_duration(elapsed),
         })
+        _clear_scrape_control(scrape_id)
         return
 
     elapsed = time.time() - start_time
     duration_fmt = _format_duration(elapsed)
+    final_status = "stopped" if stopped_by_user else "completed"
 
     update_scrape_job(scrape_id, {
-        "status": "completed",
+        "status": final_status,
         "total": limit,
         "done": done,
         "errors": errors,
         "duration_seconds": int(elapsed),
         "duration_formatted": duration_fmt,
     })
+    _clear_scrape_control(scrape_id)
     logger.info(
-        "Test scraping [%s] ολοκληρώθηκε: %d ταινίες, %d σφάλματα, διάρκεια=%s",
-        scrape_id, done, errors, duration_fmt,
+        "Test scraping [%s] %s: %d ταινίες, %d σφάλματα, διάρκεια=%s",
+        scrape_id, final_status, done, errors, duration_fmt,
     )

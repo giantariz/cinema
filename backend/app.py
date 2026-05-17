@@ -308,13 +308,10 @@ def enrich_movie(movie_id: str):
 @app.post("/api/scrape/start")
 @require_scrape_key
 def scrape_start():
-    """Έναρξη scraping σε background thread."""
+    """Έναρξη scraping σε background thread (πάντα incremental mode)."""
     data = request.get_json(force=True, silent=True) or {}
-    mode = data.get("mode", "full")
-    if mode not in ("full", "incremental"):
-        return jsonify({"error": "Μη έγκυρο mode. Χρησιμοποίησε 'full' ή 'incremental'"}), 400
-
-    full_rescrape = bool(data.get("full_rescrape", False))
+    mode = "incremental"
+    full_rescrape = False
 
     batch_size = data.get("batch_size")
     if batch_size is not None:
@@ -356,18 +353,70 @@ def scrape_start():
 @app.post("/api/scrape/test")
 @require_scrape_key
 def scrape_test():
-    """Test scraping: σβήνει τη βάση movies και φέρνει 25 ταινίες."""
+    """Test scraping: σβήνει τη βάση movies και φέρνει N ταινίες."""
+    data = request.get_json(force=True, silent=True) or {}
+    limit = 25
+    try:
+        limit = max(1, int(data.get("limit", 25)))
+    except (ValueError, TypeError):
+        limit = 25
+
     scrape_id = str(uuid.uuid4())
     db.create_scrape_job(scrape_id, "test")
 
     t = threading.Thread(
         target=scraper.run_test_scrape,
-        args=(scrape_id,),
+        args=(scrape_id, limit),
         daemon=True,
     )
     t.start()
 
-    return jsonify({"scrape_id": scrape_id, "status": "started", "mode": "test"}), 202
+    return jsonify({"scrape_id": scrape_id, "status": "started", "mode": "test", "limit": limit}), 202
+
+
+@app.post("/api/scrape/pause")
+@require_scrape_key
+def scrape_pause():
+    """Παύση του τρέχοντος scraping job."""
+    data = request.get_json(force=True, silent=True) or {}
+    scrape_id = data.get("scrape_id")
+    if not scrape_id:
+        return jsonify({"error": "Λείπει το scrape_id"}), 400
+    scraper.set_scrape_control(scrape_id, "paused")
+    return jsonify({"status": "paused"}), 200
+
+
+@app.post("/api/scrape/resume")
+@require_scrape_key
+def scrape_resume():
+    """Συνέχιση παυσαρισμένου scraping job."""
+    data = request.get_json(force=True, silent=True) or {}
+    scrape_id = data.get("scrape_id")
+    if not scrape_id:
+        return jsonify({"error": "Λείπει το scrape_id"}), 400
+    scraper.set_scrape_control(scrape_id, "running")
+    return jsonify({"status": "running"}), 200
+
+
+@app.post("/api/scrape/stop")
+@require_scrape_key
+def scrape_stop():
+    """Διακοπή του τρέχοντος scraping job."""
+    data = request.get_json(force=True, silent=True) or {}
+    scrape_id = data.get("scrape_id")
+    if not scrape_id:
+        return jsonify({"error": "Λείπει το scrape_id"}), 400
+    scraper.set_scrape_control(scrape_id, "stopped")
+    return jsonify({"status": "stopped"}), 200
+
+
+@app.post("/api/admin/clear-database")
+@require_scrape_key
+def clear_database():
+    """Διαγραφή ΟΛΗΣ της βάσης ταινιών."""
+    count = db.clear_movies_collection()
+    logger.info("Διαγραφή βάσης: %d ταινίες διαγράφηκαν", count)
+    return jsonify({"status": "cleared", "deleted": count}), 200
 
 
 @app.get("/api/scrape/status")

@@ -419,8 +419,8 @@ select option { background: var(--bg3); }
 }
 
 .card-original {
-  font-size: 0.71rem;
-  color: var(--text3);
+  font-size: 0.73rem;
+  color: var(--text2);
   margin-bottom: 5px;
   font-style: italic;
   white-space: nowrap;
@@ -1166,8 +1166,26 @@ select option { background: var(--bg3); }
 .btn-admin-action:hover { color: var(--text); border-color: var(--accent); }
 .btn-admin-action.accent { background: var(--accent); color: #0a0a0f; border-color: var(--accent); font-weight: 600; }
 .btn-admin-action.accent:hover { background: var(--accent2); }
-.btn-test-scrape { background: #7c3a00; border-color: #e07b00; color: #ffb347; font-weight: 600; width: 100%; justify-content: center; }
+.btn-test-scrape { background: #7c3a00; border-color: #e07b00; color: #ffb347; font-weight: 600; }
 .btn-test-scrape:hover { background: #a35000; border-color: #ffb347; color: #fff; }
+.btn-pause-scrape  { background: #5a4a00; border-color: #c9a800; color: #ffd740; font-weight: 600; }
+.btn-pause-scrape:hover  { background: #7a6400; border-color: #ffd740; color: #fff; }
+.btn-resume-scrape { background: #0a4a0a; border-color: #2da82d; color: #55cc88; font-weight: 600; }
+.btn-resume-scrape:hover { background: #0e6a0e; border-color: #55cc88; color: #fff; }
+.btn-stop-scrape   { background: #4a0a0a; border-color: #cc3333; color: #ff6666; font-weight: 600; }
+.btn-stop-scrape:hover   { background: #6a1010; border-color: #ff6666; color: #fff; }
+.btn-danger-scrape { background: #3a0808; border-color: #991111; color: #e86060; font-weight: 600; width: 100%; justify-content: center; }
+.btn-danger-scrape:hover { background: #5a1010; border-color: #e86060; color: #fff; }
+.admin-timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+  font-size: 0.9rem;
+}
+.timer-label { color: var(--text2); }
+.timer-value { font-family: monospace; font-size: 1.1rem; color: var(--accent); font-weight: 600; letter-spacing: 1px; }
+.admin-divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 
 .btn-admin-close {
   background: none;
