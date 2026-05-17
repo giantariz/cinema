@@ -143,9 +143,40 @@ _KNOWN_GENRES = [
 ]
 # Ελληνικά άρθρα / λέξεις που ξεκινούν πρόταση (δεν είναι ονοματεπώνυμο)
 _GREEK_SENTENCE_STARTERS = {
-    "Μια", "Μία", "Ένας", "Ένα", "Ο", "Η", "Το", "Οι", "Τα", "Τους", "Τις",
-    "Στην", "Στον", "Στο", "Στα", "Στους", "Με", "Όταν", "Αν", "Σε", "Από",
-    "Κατά", "Για", "Προς", "Ως", "Είναι", "Ήταν", "Αυτός", "Αυτή", "Αυτό",
+    # Άρθρα
+    "Ο", "Η", "Το", "Οι", "Τα", "Τους", "Τις",
+    # Αόριστα άρθρα / αριθμητικά
+    "Ένας", "Ένα", "Μια", "Μία",
+    "Δύο", "Τρεις", "Τρία", "Τέσσερις", "Τέσσερα", "Πέντε", "Έξι",
+    "Επτά", "Εφτά", "Οκτώ", "Εννιά", "Εννέα", "Δέκα", "Είκοσι",
+    "Τριάντα", "Σαράντα", "Πενήντα", "Εκατό", "Χίλια",
+    # Προθέσεις / σύνδεσμοι
+    "Στην", "Στον", "Στο", "Στα", "Στους", "Στις",
+    "Με", "Χωρίς", "Από", "Για", "Προς", "Ως", "Σε", "Κατά",
+    "Όταν", "Αν", "Αλλά", "Ενώ", "Καθώς", "Μετά", "Πριν",
+    "Παρά", "Ώσπου", "Μόλις", "Αφού",
+    # Αντωνυμίες
+    "Αυτός", "Αυτή", "Αυτό", "Αυτοί", "Αυτές",
+    "Κάποιος", "Κάποια", "Κάποιο", "Κανείς", "Κανένας", "Κανένα",
+    "Μερικοί", "Μερικές", "Μερικά", "Όλοι", "Όλες", "Όλα",
+    "Τίποτα", "Τίποτε",
+    # Επίθετα / μετοχές που ξεκινούν συχνά περιγραφές
+    "Βασισμένο", "Βασισμένη", "Βασισμένος",
+    "Εμπνευσμένο", "Εμπνευσμένη", "Εμπνευσμένος",
+    "Εμπνευσμένα",
+    "Νέος", "Νέα", "Νέο", "Νέοι",
+    "Μικρός", "Μικρή", "Μικρό",
+    "Μεγάλος", "Μεγάλη", "Μεγάλο",
+    "Τελευταία", "Τελευταίος", "Τελευταίο",
+    "Πρώτος", "Πρώτη", "Πρώτο",
+    # Ρήματα / μετοχές
+    "Είναι", "Ήταν", "Έχει", "Είχε",
+    "Έχοντας", "Ζώντας", "Παίζοντας", "Ψάχνοντας",
+    # Επιρρήματα
+    "Έτσι", "Τότε", "Εκεί", "Εδώ", "Πάντα", "Ποτέ",
+    "Ξαφνικά", "Σύντομα", "Τελικά", "Ακόμα", "Ακόμη",
+    "Μόνο", "Μόνος", "Μαζί", "Ήδη", "Κιόλας",
+    "Πολύ", "Λίγο", "Αρκετά", "Σχεδόν",
 }
 
 
@@ -175,7 +206,7 @@ def _extract_from_dirty_description(text: str) -> dict:
     words = after_dur.split()
     skip = 0
     director_parts = []
-    for i, word in enumerate(words[:6]):
+    for i, word in enumerate(words[:3]):
         clean_word = re.sub(r"[.,;]$", "", word)
         if clean_word in _GREEK_SENTENCE_STARTERS:
             break
@@ -783,15 +814,28 @@ def _apply_tmdb_to_movie(movie_data: dict, tmdb_data: dict) -> None:
     movie_data["tmdb_enriched_at"] = datetime.now(timezone.utc).isoformat()
 
 
-def run_scrape(scrape_id: str, mode: str = "full", full_rescrape: bool = False) -> None:
+def run_scrape(
+    scrape_id: str,
+    mode: str = "full",
+    full_rescrape: bool = False,
+    batch_size: int | None = None,
+    offset: int = 0,
+) -> None:
     """
     Εκτελεί scraping. Καλείται σε background thread.
     - mode: 'full' ή 'incremental'
     - full_rescrape: αν True, αντικαθιστά υπάρχοντα docs
+    - batch_size: αν οριστεί, επεξεργάζεται μόνο τόσες ταινίες και σταματά
+    - offset: παραλείπει τις πρώτες N ταινίες (για συνέχεια batch)
     """
-    logger.info("Έναρξη scraping [%s] mode=%s full_rescrape=%s", scrape_id, mode, full_rescrape)
+    logger.info(
+        "Έναρξη scraping [%s] mode=%s full_rescrape=%s batch_size=%s offset=%s",
+        scrape_id, mode, full_rescrape, batch_size, offset,
+    )
 
     urls_seen = set()
+    skipped_offset = 0
+    processed_in_batch = 0
     done = 0
     errors = 0
     total_found = 0
@@ -803,13 +847,26 @@ def run_scrape(scrape_id: str, mode: str = "full", full_rescrape: bool = False) 
             urls_seen.add(movie_url)
             total_found += 1
 
+            # Παράλειψη των πρώτων `offset` ταινιών
+            if skipped_offset < offset:
+                skipped_offset += 1
+                continue
+
+            # Σταμάτημα μόλις συμπληρωθεί το batch
+            if batch_size and processed_in_batch >= batch_size:
+                break
+
             update_scrape_job(scrape_id, {
                 "total": total_found,
                 "done": done,
                 "errors": errors,
                 "status": "running",
                 "current_url": movie_url,
+                "offset": offset,
+                "batch_size": batch_size,
             })
+
+            processed_in_batch += 1
 
             movie_id = _extract_id_from_url(movie_url)
             if movie_id and not full_rescrape:
@@ -850,16 +907,29 @@ def run_scrape(scrape_id: str, mode: str = "full", full_rescrape: bool = False) 
             "total": total_found,
             "done": done,
             "errors": errors,
+            "offset": offset,
+            "batch_size": batch_size,
         })
         return
 
+    # Αν τελείωσε λόγω batch limit → batch_completed, αλλιώς completed
+    batch_hit_limit = batch_size and processed_in_batch >= batch_size
+    final_status = "batch_completed" if batch_hit_limit else "completed"
+    next_offset = (offset + batch_size) if batch_hit_limit else None
+
     update_scrape_job(scrape_id, {
-        "status": "completed",
+        "status": final_status,
         "total": total_found,
         "done": done,
         "errors": errors,
+        "offset": offset,
+        "batch_size": batch_size,
+        "next_offset": next_offset,
     })
-    logger.info("Ολοκλήρωση scraping [%s]: %d/%d ταινίες, %d σφάλματα", scrape_id, done, total_found, errors)
+    logger.info(
+        "Ολοκλήρωση scraping [%s] status=%s: %d/%d ταινίες, %d σφάλματα, next_offset=%s",
+        scrape_id, final_status, done, total_found, errors, next_offset,
+    )
 
 
 def run_test_scrape(scrape_id: str, limit: int = 25) -> None:

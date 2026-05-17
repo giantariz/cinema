@@ -18,6 +18,8 @@ const state = {
   fullRescrape: false,
   scrapeId: null,
   scrapeInterval: null,
+  batchSize: null,
+  nextOffset: 0,
   currentMovie: null,
   currentMovieIndex: -1,
   movieList: [],
@@ -745,21 +747,40 @@ document.getElementById('fullRescrapeToggle').addEventListener('click', function
 });
 
 document.getElementById('startScrapeBtn').addEventListener('click', async () => {
-  const key  = document.getElementById('scrapeKey').value.trim();
-  const mode = document.getElementById('scrapeMode').value;
+  const key       = document.getElementById('scrapeKey').value.trim();
+  const mode      = document.getElementById('scrapeMode').value;
+  const batchVal  = document.getElementById('batchSize').value;
+  const batchSize = batchVal ? parseInt(batchVal, 10) : null;
+  state.nextOffset = 0;
+  state.batchSize  = batchSize;
+  await _startScrape(key, mode, batchSize, 0);
+});
+
+document.getElementById('nextBatchBtn').addEventListener('click', async () => {
+  const key      = document.getElementById('scrapeKey').value.trim();
+  const mode     = document.getElementById('scrapeMode').value;
+  document.getElementById('nextBatchRow').style.display = 'none';
+  await _startScrape(key, mode, state.batchSize, state.nextOffset);
+});
+
+async function _startScrape(key, mode, batchSize, offset) {
   setAdminStatus('Εκκίνηση scraping…', 'info');
   try {
+    const body = { api_key: key, mode, full_rescrape: state.fullRescrape };
+    if (batchSize) body.batch_size = batchSize;
+    if (offset)    body.offset     = offset;
     const res = await api('/api/scrape/start', {
       method: 'POST',
-      body: JSON.stringify({ api_key: key, mode, full_rescrape: state.fullRescrape }),
+      body: JSON.stringify(body),
     });
     state.scrapeId = res.scrape_id;
-    toast(`Scraping ξεκίνησε! ID: ${res.scrape_id}`, 'success');
+    const batchInfo = batchSize ? ` (batch ${Math.floor(offset / batchSize) + 1}, offset ${offset})` : '';
+    toast(`Scraping ξεκίνησε${batchInfo}!`, 'success');
     startScrapePolling();
   } catch (e) {
     setAdminStatus('Σφάλμα: ' + e.message, 'error');
   }
-});
+}
 
 document.getElementById('refreshStatusBtn').addEventListener('click', refreshScrapeStatus);
 
@@ -793,19 +814,35 @@ async function refreshScrapeStatus() {
 function updateScrapeUI(job) {
   if (!job) return;
   const pct = job.total ? Math.round((job.done / job.total) * 100) : 0;
+  const batchLabel = job.batch_size
+    ? ` — batch ${Math.floor((job.offset || 0) / job.batch_size) + 1} (offset ${job.offset || 0})`
+    : '';
   document.getElementById('scrapeProgressWrap').style.display = '';
   document.getElementById('scrapeProgressBar').style.width = pct + '%';
   document.getElementById('scrapeProgressLabel').textContent =
-    `${job.done} / ${job.total} ταινίες — ${job.status} — σφάλματα: ${job.errors || 0}`;
+    `${job.done} / ${job.total} ταινίες${batchLabel} — σφάλματα: ${job.errors || 0}`;
 
   if (job.status === 'completed') {
     setAdminStatus(`✓ Ολοκληρώθηκε: ${job.done} ταινίες αποθηκεύτηκαν.`, 'success');
+    document.getElementById('nextBatchRow').style.display = 'none';
+    stopScrapePolling();
+  } else if (job.status === 'batch_completed') {
+    state.nextOffset = job.next_offset || 0;
+    state.batchSize  = job.batch_size  || state.batchSize;
+    const batchNum = job.batch_size ? Math.floor((job.offset || 0) / job.batch_size) + 1 : '?';
+    setAdminStatus(
+      `✓ Batch ${batchNum} ολοκληρώθηκε: ${job.done} ταινίες. Πάτησε "Επόμενο Batch" για συνέχεια.`,
+      'success',
+    );
+    document.getElementById('nextBatchRow').style.display = '';
     stopScrapePolling();
   } else if (job.status === 'error') {
     setAdminStatus(`✗ Σφάλμα: ${job.error_message || 'Άγνωστο'}`, 'error');
+    document.getElementById('nextBatchRow').style.display = 'none';
     stopScrapePolling();
   } else {
     setAdminStatus(`Σε εξέλιξη… (${pct}%)`, 'info');
+    document.getElementById('nextBatchRow').style.display = 'none';
   }
 }
 
