@@ -308,10 +308,15 @@ def enrich_movie(movie_id: str):
 @app.post("/api/scrape/start")
 @require_scrape_key
 def scrape_start():
-    """Έναρξη scraping σε background thread (πάντα incremental mode)."""
+    """Έναρξη scraping σε background thread."""
     data = request.get_json(force=True, silent=True) or {}
-    mode = "incremental"
-    full_rescrape = False
+
+    mode = data.get("mode", "incremental")
+    if mode not in ("incremental", "full"):
+        mode = "incremental"
+
+    full_rescrape = bool(data.get("full_rescrape", False))
+    skip_tmdb = bool(data.get("skip_tmdb", False))
 
     batch_size = data.get("batch_size")
     if batch_size is not None:
@@ -328,6 +333,14 @@ def scrape_start():
     except (ValueError, TypeError):
         offset = 0
 
+    movie_timeout = None
+    try:
+        t_val = data.get("movie_timeout")
+        if t_val is not None:
+            movie_timeout = max(10, int(t_val))
+    except (ValueError, TypeError):
+        pass
+
     scrape_id = str(uuid.uuid4())
 
     # Εγγραφή job στο Firestore
@@ -336,7 +349,7 @@ def scrape_start():
     # Εκκίνηση σε background thread
     t = threading.Thread(
         target=scraper.run_scrape,
-        args=(scrape_id, mode, full_rescrape, batch_size, offset),
+        args=(scrape_id, mode, full_rescrape, batch_size, offset, skip_tmdb, movie_timeout),
         daemon=True,
     )
     t.start()
@@ -347,6 +360,7 @@ def scrape_start():
         "mode": mode,
         "batch_size": batch_size,
         "offset": offset,
+        "skip_tmdb": skip_tmdb,
     }), 202
 
 
