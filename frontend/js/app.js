@@ -822,8 +822,10 @@ function updateScrapeUI(job) {
   document.getElementById('scrapeProgressLabel').textContent =
     `${job.done} / ${job.total} ταινίες${batchLabel} — σφάλματα: ${job.errors || 0}`;
 
+  const durationLabel = job.duration_formatted ? ` — Διάρκεια: ${job.duration_formatted}` : '';
+
   if (job.status === 'completed') {
-    setAdminStatus(`✓ Ολοκληρώθηκε: ${job.done} ταινίες αποθηκεύτηκαν.`, 'success');
+    setAdminStatus(`✓ Ολοκληρώθηκε: ${job.done} ταινίες αποθηκεύτηκαν${durationLabel}.`, 'success');
     document.getElementById('nextBatchRow').style.display = 'none';
     stopScrapePolling();
   } else if (job.status === 'batch_completed') {
@@ -831,13 +833,13 @@ function updateScrapeUI(job) {
     state.batchSize  = job.batch_size  || state.batchSize;
     const batchNum = job.batch_size ? Math.floor((job.offset || 0) / job.batch_size) + 1 : '?';
     setAdminStatus(
-      `✓ Batch ${batchNum} ολοκληρώθηκε: ${job.done} ταινίες. Πάτησε "Επόμενο Batch" για συνέχεια.`,
+      `✓ Batch ${batchNum} ολοκληρώθηκε: ${job.done} ταινίες. Πάτησε "Επόμενο Batch" για συνέχεια${durationLabel}.`,
       'success',
     );
     document.getElementById('nextBatchRow').style.display = '';
     stopScrapePolling();
   } else if (job.status === 'error') {
-    setAdminStatus(`✗ Σφάλμα: ${job.error_message || 'Άγνωστο'}`, 'error');
+    setAdminStatus(`✗ Σφάλμα: ${job.error_message || 'Άγνωστο'}${durationLabel}`, 'error');
     document.getElementById('nextBatchRow').style.display = 'none';
     stopScrapePolling();
   } else {

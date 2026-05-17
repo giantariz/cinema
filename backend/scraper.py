@@ -2,6 +2,7 @@
 Scraper για τις κριτικές ταινιών του Athinorama.
 Rate limiting: 1-2 δευτερόλεπτα delay μεταξύ requests.
 """
+import concurrent.futures
 import logging
 import os
 import re
@@ -41,6 +42,9 @@ SESSION.headers.update(HEADERS)
 
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
 TMDB_BASE = "https://api.themoviedb.org/3"
+
+# Μέγιστος χρόνος επεξεργασίας ανά ταινία (seconds) - αν κολλήσει, την προσπερνά
+MOVIE_SCRAPE_TIMEOUT = 60
 
 
 # ---------------------------------------------------------------------------
@@ -814,6 +818,35 @@ def _apply_tmdb_to_movie(movie_data: dict, tmdb_data: dict) -> None:
     movie_data["tmdb_enriched_at"] = datetime.now(timezone.utc).isoformat()
 
 
+def _scrape_and_enrich(movie_url: str) -> dict | None:
+    """Scrape μιας ταινίας + TMDB enrich. Τρέχει μέσα σε thread με timeout."""
+    data = scrape_movie_details(movie_url)
+    if data and TMDB_API_KEY:
+        try:
+            tmdb_data = find_tmdb_data(
+                title=data.get("title", ""),
+                original_title=data.get("title_original", ""),
+                year=data.get("year"),
+            )
+            if tmdb_data:
+                _apply_tmdb_to_movie(data, tmdb_data)
+        except Exception as te:
+            logger.warning("TMDB αποτυχία για '%s': %s", data.get("title"), te)
+    return data
+
+
+def _format_duration(seconds: float) -> str:
+    """Μετατρέπει seconds σε αναγνώσιμη μορφή."""
+    seconds = int(seconds)
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}ω {m}λ {s}δ"
+    if m:
+        return f"{m}λ {s}δ"
+    return f"{s}δ"
+
+
 def run_scrape(
     scrape_id: str,
     mode: str = "full",
@@ -833,6 +866,7 @@ def run_scrape(
         scrape_id, mode, full_rescrape, batch_size, offset,
     )
 
+    start_time = time.time()
     urls_seen = set()
     skipped_offset = 0
     processed_in_batch = 0
@@ -876,19 +910,18 @@ def run_scrape(
                     continue
 
             try:
-                data = scrape_movie_details(movie_url)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(_scrape_and_enrich, movie_url)
+                    try:
+                        data = future.result(timeout=MOVIE_SCRAPE_TIMEOUT)
+                    except concurrent.futures.TimeoutError:
+                        errors += 1
+                        logger.warning(
+                            "⏱ Timeout (%ds) για %s - προσπέρασμα",
+                            MOVIE_SCRAPE_TIMEOUT, movie_url,
+                        )
+                        continue
                 if data:
-                    if TMDB_API_KEY:
-                        try:
-                            tmdb_data = find_tmdb_data(
-                                title=data.get("title", ""),
-                                original_title=data.get("title_original", ""),
-                                year=data.get("year"),
-                            )
-                            if tmdb_data:
-                                _apply_tmdb_to_movie(data, tmdb_data)
-                        except Exception as te:
-                            logger.warning("TMDB αποτυχία για '%s': %s", data.get("title"), te)
                     save_movie(data)
                     done += 1
                     logger.debug("✓ Αποθηκεύτηκε: %s (%s)", data.get("title"), movie_id)
@@ -900,6 +933,7 @@ def run_scrape(
                 logger.error("✗ Σφάλμα για %s: %s", movie_url, e)
 
     except Exception as e:
+        elapsed = time.time() - start_time
         logger.error("Κρίσιμο σφάλμα scraping: %s", e)
         update_scrape_job(scrape_id, {
             "status": "error",
@@ -909,8 +943,13 @@ def run_scrape(
             "errors": errors,
             "offset": offset,
             "batch_size": batch_size,
+            "duration_seconds": int(elapsed),
+            "duration_formatted": _format_duration(elapsed),
         })
         return
+
+    elapsed = time.time() - start_time
+    duration_fmt = _format_duration(elapsed)
 
     # Αν τελείωσε λόγω batch limit → batch_completed, αλλιώς completed
     batch_hit_limit = batch_size and processed_in_batch >= batch_size
@@ -925,10 +964,12 @@ def run_scrape(
         "offset": offset,
         "batch_size": batch_size,
         "next_offset": next_offset,
+        "duration_seconds": int(elapsed),
+        "duration_formatted": duration_fmt,
     })
     logger.info(
-        "Ολοκλήρωση scraping [%s] status=%s: %d/%d ταινίες, %d σφάλματα, next_offset=%s",
-        scrape_id, final_status, done, total_found, errors, next_offset,
+        "Ολοκλήρωση scraping [%s] status=%s: %d/%d ταινίες, %d σφάλματα, next_offset=%s, διάρκεια=%s",
+        scrape_id, final_status, done, total_found, errors, next_offset, duration_fmt,
     )
 
 
@@ -939,6 +980,7 @@ def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
     """
     logger.info("Test scraping [%s]: καθαρισμός βάσης + %d ταινίες", scrape_id, limit)
 
+    start_time = time.time()
     update_scrape_job(scrape_id, {"status": "running", "total": limit, "done": 0, "errors": 0})
 
     cleared = clear_movies_collection()
@@ -966,19 +1008,18 @@ def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
             })
 
             try:
-                data = scrape_movie_details(movie_url)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(_scrape_and_enrich, movie_url)
+                    try:
+                        data = future.result(timeout=MOVIE_SCRAPE_TIMEOUT)
+                    except concurrent.futures.TimeoutError:
+                        errors += 1
+                        logger.warning(
+                            "⏱ Timeout (%ds) για %s - προσπέρασμα",
+                            MOVIE_SCRAPE_TIMEOUT, movie_url,
+                        )
+                        continue
                 if data:
-                    if TMDB_API_KEY:
-                        try:
-                            tmdb_data = find_tmdb_data(
-                                title=data.get("title", ""),
-                                original_title=data.get("title_original", ""),
-                                year=data.get("year"),
-                            )
-                            if tmdb_data:
-                                _apply_tmdb_to_movie(data, tmdb_data)
-                        except Exception as te:
-                            logger.warning("TMDB αποτυχία για '%s': %s", data.get("title"), te)
                     save_movie(data)
                     done += 1
                     logger.debug("✓ Test: %s", data.get("title"))
@@ -989,6 +1030,7 @@ def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
                 logger.error("✗ Test σφάλμα για %s: %s", movie_url, e)
 
     except Exception as e:
+        elapsed = time.time() - start_time
         logger.error("Κρίσιμο σφάλμα test scraping: %s", e)
         update_scrape_job(scrape_id, {
             "status": "error",
@@ -996,13 +1038,23 @@ def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
             "total": limit,
             "done": done,
             "errors": errors,
+            "duration_seconds": int(elapsed),
+            "duration_formatted": _format_duration(elapsed),
         })
         return
+
+    elapsed = time.time() - start_time
+    duration_fmt = _format_duration(elapsed)
 
     update_scrape_job(scrape_id, {
         "status": "completed",
         "total": limit,
         "done": done,
         "errors": errors,
+        "duration_seconds": int(elapsed),
+        "duration_formatted": duration_fmt,
     })
-    logger.info("Test scraping [%s] ολοκληρώθηκε: %d ταινίες, %d σφάλματα", scrape_id, done, errors)
+    logger.info(
+        "Test scraping [%s] ολοκληρώθηκε: %d ταινίες, %d σφάλματα, διάρκεια=%s",
+        scrape_id, done, errors, duration_fmt,
+    )
