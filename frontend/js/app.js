@@ -935,8 +935,14 @@ function updateScrapeUI(job) {
     document.getElementById('scrapeProgressLabel').textContent = 'Ανακάλυψη URLs… (αυτό μπορεί να πάρει λίγα λεπτά)';
     _setCurrentMovie(null);
   } else {
+    const newCount     = job.done    || 0;
+    const skippedCount = job.skipped || 0;
+    const errCount     = job.errors  || 0;
+    const parts = [`${newCount} νέες`];
+    if (skippedCount > 0) parts.push(`${skippedCount} ήδη υπήρχαν`);
+    if (errCount > 0)     parts.push(`${errCount} σφάλματα`);
     document.getElementById('scrapeProgressLabel').textContent =
-      `${job.done} / ${job.total || '?'} ταινίες${batchLabel} — σφάλματα: ${job.errors || 0}`;
+      `${parts.join(' · ')}${batchLabel}`;
     _setCurrentMovie(job.current_url);
   }
 
@@ -944,7 +950,10 @@ function updateScrapeUI(job) {
 
   if (job.status === 'completed') {
     state.stopRequested = state.pauseRequested = false;
-    setAdminStatus(`✓ Ολοκληρώθηκε: ${job.done} ταινίες αποθηκεύτηκαν${durationLabel}.`, 'success');
+    const newCount = job.done || 0;
+    const skipMsg  = job.skipped ? ` · ${job.skipped} ήδη υπήρχαν` : '';
+    const noNewMsg = newCount === 0 ? ' — Δοκίμασε Full mode για να βρεις νέες!' : '';
+    setAdminStatus(`✓ Ολοκληρώθηκε: ${newCount} νέες ταινίες${skipMsg}${durationLabel}${noNewMsg}`, newCount > 0 ? 'success' : 'info');
     document.getElementById('nextBatchRow').style.display = 'none';
     _setCurrentMovie(null);
     stopScrapePolling();
@@ -966,7 +975,8 @@ function updateScrapeUI(job) {
     _setScrapeActive(false);
   } else if (job.status === 'stopped') {
     state.stopRequested = state.pauseRequested = false;
-    setAdminStatus(`⏹ Διακόπηκε: ${job.done} ταινίες αποθηκεύτηκαν${durationLabel}.`, 'info');
+    const skipMsg2 = job.skipped ? ` · ${job.skipped} ήδη υπήρχαν` : '';
+    setAdminStatus(`⏹ Διακόπηκε: ${job.done || 0} νέες ταινίες${skipMsg2}${durationLabel}.`, 'info');
     document.getElementById('nextBatchRow').style.display = 'none';
     _setCurrentMovie(null);
     stopScrapePolling();
