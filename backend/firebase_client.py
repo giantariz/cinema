@@ -95,9 +95,9 @@ def get_movies(filters: dict) -> dict:
     if year_to:
         query = query.where("year", "<=", int(year_to))
     if imdb_min:
-        query = query.where("imdb_score", ">=", float(imdb_min))
+        query = query.where("tmdb_score", ">=", float(imdb_min))
     if imdb_max:
-        query = query.where("imdb_score", "<=", float(imdb_max))
+        query = query.where("tmdb_score", "<=", float(imdb_max))
     if country:
         query = query.where("country", "==", country)
     if duration_min:
@@ -108,7 +108,7 @@ def get_movies(filters: dict) -> dict:
     # Ταξινόμηση
     sort_by = filters.get("sort_by", "year")
     sort_dir = filters.get("sort_dir", "desc")
-    valid_sorts = {"year", "imdb_score", "title", "duration"}
+    valid_sorts = {"year", "tmdb_score", "title", "duration"}
     if sort_by not in valid_sorts:
         sort_by = "year"
     direction = firestore.Query.DESCENDING if sort_dir == "desc" else firestore.Query.ASCENDING

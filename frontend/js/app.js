@@ -169,9 +169,9 @@ function renderMovieCard(movie, isUserMovie = false, index = -1) {
     <div class="card-body">
       <div class="card-title">${escHtml(movie.title)}</div>
       ${originalTitle ? `<div class="card-original">${escHtml(originalTitle)}</div>` : ''}
-      ${movie.imdb_score ? `
+      ${movie.tmdb_score ? `
         <div class="card-tmdb-score">
-          <span class="card-tmdb-score-value">${movie.imdb_score}</span>
+          <span class="card-tmdb-score-value">${movie.tmdb_score}</span>
           <span class="card-tmdb-score-label">TMDB</span>
         </div>` : movie.stars ? `
         <div class="card-stars">
@@ -399,9 +399,9 @@ function _updateModalFields(movie) {
   // Ratings row — μόνο TMDB score
   const ratingsEl = document.getElementById('modalRatings');
   let ratingsHtml = '';
-  if (movie.imdb_score) {
+  if (movie.tmdb_score) {
     ratingsHtml = `<div class="modal-rating-tmdb">
-      <span class="modal-rating-tmdb-score">${movie.imdb_score}</span>
+      <span class="modal-rating-tmdb-score">${movie.tmdb_score}</span>
       <span class="modal-rating-tmdb-max">/10</span>
       <span class="modal-rating-tmdb-label">TMDB</span>
     </div>`;
@@ -516,14 +516,14 @@ function openModal(movie, isUserEntry = false) {
   // TMDB enrichment: χωρίς tmdb_id → πλήρης αναζήτηση αν λείπουν βασικά πεδία.
   // Με tmdb_id → re-fetch μόνο αν δεν υπάρχει tmdb_enriched_at (enrichment δεν έτρεξε ποτέ
   // ή έτρεξε πριν προστεθούν νέα πεδία). Το timestamp αποθηκεύεται μετά από κάθε επιτυχές fetch.
-  const missingBasic = !movie.genre?.length || !movie.director?.length || !movie.cast?.length || !movie.imdb_score;
+  const missingBasic = !movie.genre?.length || !movie.director?.length || !movie.cast?.length || !movie.tmdb_score;
   const missingNew   = !movie.tmdb_enriched_at;
   const needsEnrich  = movie.id && ((!movie.tmdb_id && missingBasic) || (movie.tmdb_id && missingNew));
   if (needsEnrich) {
     console.log('[TMDB] enriching:', movie.id, movie.title, '| tmdb_id:', movie.tmdb_id, '| lang:', movie.original_language);
     api(`/api/movies/${encodeURIComponent(movie.id)}/enrich`)
       .then(enriched => {
-        console.log('[TMDB] response → enriched:', enriched?.enriched, '| tmdb_id:', enriched?.tmdb_id, '| lang:', enriched?.original_language, '| score:', enriched?.imdb_score, '| cast:', enriched?.cast_roles?.length);
+        console.log('[TMDB] response → enriched:', enriched?.enriched, '| tmdb_id:', enriched?.tmdb_id, '| lang:', enriched?.original_language, '| score:', enriched?.tmdb_score, '| cast:', enriched?.cast_roles?.length);
         if (!enriched || enriched.enriched === false) {
           console.warn('[TMDB] skipped (enriched=false or null). TMDB_API_KEY set?');
           return;
