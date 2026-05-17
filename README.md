@@ -241,9 +241,31 @@ Health check.
 {
   "api_key": "your-key",
   "mode": "incremental",
-  "full_rescrape": false
+  "batch_size": 500,
+  "offset": 0,
+  "skip_tmdb": false,
+  "full_rescrape": false,
+  "movie_timeout": 60
 }
 ```
+
+| Param | Default | Περιγραφή |
+|---|---|---|
+| `mode` | `incremental` | `incremental` (τελευταίοι 2 μήνες) ή `full` (ολόκληρο αρχείο) |
+| `batch_size` | null (χωρίς όριο) | Πόσες **νέες** ταινίες να κατεβάσει πριν σταματήσει |
+| `offset` | `0` | Από ποια θέση URL να ξεκινήσει (για συνέχεια batch) |
+| `skip_tmdb` | `false` | `true` = παράλειψη TMDB enrichment (πιο γρήγορο) |
+| `full_rescrape` | `false` | `true` = αντικατάσταση ταινιών που υπάρχουν ήδη |
+| `movie_timeout` | `60` | Timeout ανά ταινία σε δευτερόλεπτα |
+
+**Response fields:**
+
+| Field | Περιγραφή |
+|---|---|
+| `done` | Νέες ταινίες που αποθηκεύτηκαν |
+| `skipped` | Ταινίες που υπήρχαν ήδη στη βάση (δεν ξαναγράφτηκαν) |
+| `errors` | Αποτυχίες |
+| `total` | Σύνολο URLs που ανακαλύφθηκαν |
 
 #### `GET /api/scrape/status`
 Status scrape job.
@@ -301,6 +323,16 @@ Sync από Google Sheets. Requires `Authorization: Bearer <SYNC_API_KEY>`.
 ---
 
 ## Changelog
+
+### v1.3 — Scraper Config & Fixes
+
+- **Bug fix**: Το scrape mode ήταν hardcoded σε `incremental` — τώρα επιλέγεται από το UI
+- **Mode selector**: `Incremental` (τελευταίοι 2 μήνες) ή `Full` (ολόκληρο αρχείο ~17k ταινίες)
+- **Skip TMDB checkbox**: Παράλειψη TMDB enrichment για πολύ πιο γρήγορο scraping
+- **Διαχωρισμός done/skipped**: Το UI πλέον δείχνει ξεχωριστά "X νέες · Y ήδη υπήρχαν"
+- **batch_size βασισμένο σε νέες ταινίες**: Το batch limit μετράει πλέον μόνο τις νέες που κατεβάστηκαν, όχι τις ήδη υπάρχουσες
+- **Configurable timeout & TMDB skip** μέσω API
+- **UI**: Current movie display, discovering status, καθαρότερο layout
 
 ### v1.2 — TMDB Enrichment Fixes
 

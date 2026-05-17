@@ -923,6 +923,7 @@ def run_scrape(
     set_scrape_control(scrape_id, "running")
     start_time = time.time()
     done = 0
+    skipped = 0
     errors = 0
     total_found = 0
     processed_in_batch = 0
@@ -958,6 +959,7 @@ def run_scrape(
             "status": "running",
             "total": total_found,
             "done": done,
+            "skipped": skipped,
             "errors": errors,
             "offset": offset,
             "batch_size": batch_size,
@@ -977,7 +979,7 @@ def run_scrape(
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         try:
           for movie_url in urls_to_process:
-            if batch_size and processed_in_batch >= batch_size:
+            if batch_size and done >= batch_size:
                 break
 
             # Έλεγχος pause/stop
@@ -991,6 +993,7 @@ def run_scrape(
                     "status": "paused",
                     "total": total_found,
                     "done": done,
+                    "skipped": skipped,
                     "errors": errors,
                     "offset": offset,
                     "batch_size": batch_size,
@@ -1008,6 +1011,7 @@ def run_scrape(
             update_scrape_job(scrape_id, {
                 "total": total_found,
                 "done": done,
+                "skipped": skipped,
                 "errors": errors,
                 "status": "running",
                 "current_url": movie_url,
@@ -1019,7 +1023,7 @@ def run_scrape(
 
             movie_id = _extract_id_from_url(movie_url)
             if movie_id and movie_id in existing_ids:
-                done += 1
+                skipped += 1
                 continue
 
             try:
@@ -1072,6 +1076,7 @@ def run_scrape(
             "error_message": str(e),
             "total": total_found,
             "done": done,
+            "skipped": skipped,
             "errors": errors,
             "offset": offset,
             "batch_size": batch_size,
@@ -1088,15 +1093,16 @@ def run_scrape(
         final_status = "stopped"
         next_offset = offset + processed_in_batch
     else:
-        # Αν τελείωσε λόγω batch limit → batch_completed, αλλιώς completed
-        batch_hit_limit = batch_size and processed_in_batch >= batch_size
+        # Αν τελείωσε λόγω batch limit (done >= batch_size) → batch_completed, αλλιώς completed
+        batch_hit_limit = batch_size and done >= batch_size
         final_status = "batch_completed" if batch_hit_limit else "completed"
-        next_offset = (offset + batch_size) if batch_hit_limit else None
+        next_offset = (offset + processed_in_batch) if batch_hit_limit else None
 
     update_scrape_job(scrape_id, {
         "status": final_status,
         "total": total_found,
         "done": done,
+        "skipped": skipped,
         "errors": errors,
         "offset": offset,
         "batch_size": batch_size,
