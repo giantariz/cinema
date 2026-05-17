@@ -75,6 +75,23 @@ def get_movie(movie_id: str) -> dict | None:
     return None
 
 
+def get_existing_movie_ids(ids: list[str]) -> set[str]:
+    """Επιστρέφει τα IDs που υπάρχουν ήδη στο Firestore, σε batch."""
+    db = _get_db()
+    if not ids:
+        return set()
+    col = db.collection("movies")
+    refs = [col.document(str(id_)) for id_ in ids]
+    existing: set[str] = set()
+    # get_all στέλνει έως 300 refs ανά RPC — πολύ πιο αποδοτικό από N μεμονωμένα reads
+    _BATCH = 300
+    for i in range(0, len(refs), _BATCH):
+        for doc in db.get_all(refs[i:i + _BATCH]):
+            if doc.exists:
+                existing.add(doc.id)
+    return existing
+
+
 def get_movies(filters: dict) -> dict:
     """
     Αναζήτηση ταινιών με φίλτρα.

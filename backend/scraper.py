@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 from firebase_client import (
     save_movie,
     get_movie,
+    get_existing_movie_ids,
     update_scrape_job,
     clear_movies_collection,
     save_url_list_cache,
@@ -82,7 +83,7 @@ def _tmdb_get(url: str, params: dict) -> requests.Response | None:
     for attempt in range(3):
         try:
             time.sleep(TMDB_REQUEST_DELAY)
-            r = requests.get(url, params=params, timeout=10)
+            r = SESSION.get(url, params=params, timeout=10)
             if r.status_code == 429:
                 retry_after = int(r.headers.get("Retry-After", 10))
                 logger.warning("TMDB rate limit (429) — αναμονή %ds", retry_after)
@@ -942,8 +943,20 @@ def run_scrape(
         })
 
         # --- Φάση 2: Scraping ---
+        # Batch-check ποιά IDs υπάρχουν ήδη, αντί για N ξεχωριστά Firestore reads
+        if not full_rescrape:
+            all_ids = [_extract_id_from_url(u) for u in urls_to_process]
+            valid_ids = [id_ for id_ in all_ids if id_]
+            existing_ids = get_existing_movie_ids(valid_ids)
+            logger.info("Batch check: %d/%d ταινίες υπάρχουν ήδη", len(existing_ids), len(valid_ids))
+        else:
+            existing_ids = set()
+
         stopped_by_user = False
-        for movie_url in urls_to_process:
+        # Ο executor δημιουργείται μία φορά εκτός loop — αποφεύγουμε το overhead
+        # δημιουργίας/καταστροφής thread pool για κάθε ταινία
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+          for movie_url in urls_to_process:
             if batch_size and processed_in_batch >= batch_size:
                 break
 
@@ -985,24 +998,21 @@ def run_scrape(
             processed_in_batch += 1
 
             movie_id = _extract_id_from_url(movie_url)
-            if movie_id and not full_rescrape:
-                existing = get_movie(movie_id)
-                if existing:
-                    done += 1
-                    continue
+            if movie_id and movie_id in existing_ids:
+                done += 1
+                continue
 
             try:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(_scrape_and_enrich, movie_url)
-                    try:
-                        data = future.result(timeout=MOVIE_SCRAPE_TIMEOUT)
-                    except concurrent.futures.TimeoutError:
-                        errors += 1
-                        logger.warning(
-                            "⏱ Timeout (%ds) για %s - προσπέρασμα",
-                            MOVIE_SCRAPE_TIMEOUT, movie_url,
-                        )
-                        continue
+                future = executor.submit(_scrape_and_enrich, movie_url)
+                try:
+                    data = future.result(timeout=MOVIE_SCRAPE_TIMEOUT)
+                except concurrent.futures.TimeoutError:
+                    errors += 1
+                    logger.warning(
+                        "⏱ Timeout (%ds) για %s - προσπέρασμα",
+                        MOVIE_SCRAPE_TIMEOUT, movie_url,
+                    )
+                    continue
                 if data:
                     save_movie(data)
                     done += 1
