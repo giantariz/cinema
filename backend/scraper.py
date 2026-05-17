@@ -74,8 +74,8 @@ TMDB_REQUEST_DELAY = 0.2
 # ---------------------------------------------------------------------------
 
 def _sleep():
-    """Rate limiting: 1-2 δευτερόλεπτα pause."""
-    time.sleep(random.uniform(1.0, 2.0))
+    """Rate limiting: 0.3-0.8 δευτερόλεπτα pause."""
+    time.sleep(random.uniform(0.3, 0.8))
 
 
 def _tmdb_get(url: str, params: dict) -> requests.Response | None:
@@ -969,9 +969,8 @@ def run_scrape(
             existing_ids = set()
 
         stopped_by_user = False
-        # Ο executor δημιουργείται μία φορά εκτός loop — αποφεύγουμε το overhead
-        # δημιουργίας/καταστροφής thread pool για κάθε ταινία
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
           for movie_url in urls_to_process:
             if batch_size and processed_in_batch >= batch_size:
                 break
@@ -1020,14 +1019,32 @@ def run_scrape(
 
             try:
                 future = executor.submit(_scrape_and_enrich, movie_url)
-                try:
-                    data = future.result(timeout=MOVIE_SCRAPE_TIMEOUT)
-                except concurrent.futures.TimeoutError:
-                    errors += 1
+                deadline = time.time() + MOVIE_SCRAPE_TIMEOUT
+                data = None
+                timed_out = False
+                while True:
+                    wait = min(2.0, max(0.1, deadline - time.time()))
+                    try:
+                        data = future.result(timeout=wait)
+                        break
+                    except concurrent.futures.TimeoutError:
+                        if time.time() >= deadline:
+                            timed_out = True
+                            break
+                        if get_scrape_control(scrape_id) == "stopped":
+                            stopped_by_user = True
+                            break
+                if stopped_by_user:
+                    executor.shutdown(wait=False)
+                    break
+                if timed_out:
                     logger.warning(
                         "⏱ Timeout (%ds) για %s - προσπέρασμα",
                         MOVIE_SCRAPE_TIMEOUT, movie_url,
                     )
+                    executor.shutdown(wait=False)
+                    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                    errors += 1
                     continue
                 if data:
                     save_movie(data)
@@ -1039,6 +1056,8 @@ def run_scrape(
             except Exception as e:
                 errors += 1
                 logger.error("✗ Σφάλμα για %s: %s", movie_url, e)
+        finally:
+            executor.shutdown(wait=False)
 
     except Exception as e:
         elapsed = time.time() - start_time
