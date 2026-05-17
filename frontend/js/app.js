@@ -826,6 +826,7 @@ document.getElementById('stopScrapeBtn').addEventListener('click', async () => {
     });
     state.stopRequested  = true;
     state.pauseRequested = false;
+    stopTimer();
     setAdminStatus('⏹ Αναμονή διακοπής (τελειώνει η τρέχουσα ταινία)…', 'info');
   } catch (e) {
     toast('Σφάλμα διακοπής: ' + e.message, 'error');
