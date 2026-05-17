@@ -419,8 +419,8 @@ select option { background: var(--bg3); }
 }
 
 .card-original {
-  font-size: 0.71rem;
-  color: var(--text3);
+  font-size: 0.73rem;
+  color: var(--text2);
   margin-bottom: 5px;
   font-style: italic;
   white-space: nowrap;

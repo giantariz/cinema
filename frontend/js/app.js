@@ -387,6 +387,10 @@ function _updateModalFields(movie) {
   const director = Array.isArray(movie.director) ? movie.director.join(', ') : (movie.director || '');
   const dur      = movie.duration ? `${formatDuration(movie.duration)} (${movie.duration} λεπτά)` : null;
 
+  // Original title (ενημέρωση και μετά από enrichment)
+  const origEl = document.getElementById('modalOriginal');
+  if (movie.title_original) origEl.textContent = movie.title_original;
+
   // Backdrop hero
   const backdrop = document.getElementById('modalBackdrop');
   if (movie.backdrop_path) {
