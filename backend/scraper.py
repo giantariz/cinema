@@ -867,10 +867,10 @@ def _apply_tmdb_to_movie(movie_data: dict, tmdb_data: dict) -> None:
     movie_data["tmdb_enriched_at"] = datetime.now(timezone.utc).isoformat()
 
 
-def _scrape_and_enrich(movie_url: str) -> dict | None:
+def _scrape_and_enrich(movie_url: str, skip_tmdb: bool = False) -> dict | None:
     """Scrape μιας ταινίας + TMDB enrich. Τρέχει μέσα σε thread με timeout."""
     data = scrape_movie_details(movie_url)
-    if data and TMDB_API_KEY:
+    if data and TMDB_API_KEY and not skip_tmdb:
         try:
             tmdb_data = find_tmdb_data(
                 title=data.get("title", ""),
@@ -902,6 +902,8 @@ def run_scrape(
     full_rescrape: bool = False,
     batch_size: int | None = None,
     offset: int = 0,
+    skip_tmdb: bool = False,
+    movie_timeout: int | None = None,
 ) -> None:
     """
     Εκτελεί scraping. Καλείται σε background thread.
@@ -909,10 +911,13 @@ def run_scrape(
     - full_rescrape: αν True, αντικαθιστά υπάρχοντα docs
     - batch_size: αν οριστεί, επεξεργάζεται μόνο τόσες ταινίες και σταματά
     - offset: παραλείπει τις πρώτες N ταινίες (για συνέχεια batch)
+    - skip_tmdb: αν True, παρακάμπτει TMDB εμπλουτισμό (πιο γρήγορο scraping)
+    - movie_timeout: timeout ανά ταινία (seconds), default MOVIE_SCRAPE_TIMEOUT
     """
+    timeout = movie_timeout if movie_timeout is not None else MOVIE_SCRAPE_TIMEOUT
     logger.info(
-        "Έναρξη scraping [%s] mode=%s full_rescrape=%s batch_size=%s offset=%s",
-        scrape_id, mode, full_rescrape, batch_size, offset,
+        "Έναρξη scraping [%s] mode=%s full_rescrape=%s batch_size=%s offset=%s skip_tmdb=%s timeout=%s",
+        scrape_id, mode, full_rescrape, batch_size, offset, skip_tmdb, timeout,
     )
 
     set_scrape_control(scrape_id, "running")
@@ -1018,8 +1023,8 @@ def run_scrape(
                 continue
 
             try:
-                future = executor.submit(_scrape_and_enrich, movie_url)
-                deadline = time.time() + MOVIE_SCRAPE_TIMEOUT
+                future = executor.submit(_scrape_and_enrich, movie_url, skip_tmdb)
+                deadline = time.time() + timeout
                 data = None
                 timed_out = False
                 while True:
@@ -1040,7 +1045,7 @@ def run_scrape(
                 if timed_out:
                     logger.warning(
                         "⏱ Timeout (%ds) για %s - προσπέρασμα",
-                        MOVIE_SCRAPE_TIMEOUT, movie_url,
+                        timeout, movie_url,
                     )
                     executor.shutdown(wait=False)
                     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)

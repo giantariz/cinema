@@ -269,11 +269,22 @@
 <!-- ========== ADMIN / SCRAPE PANEL ========== -->
 <div class="admin-overlay hidden" id="adminOverlay">
   <div class="admin-panel">
-    <div class="admin-title">⚙ Διαχείριση Scraping</div>
+    <div class="admin-header-row">
+      <div class="admin-title">⚙ Διαχείριση Scraping</div>
+      <button class="btn-admin-close" id="adminClose">✕</button>
+    </div>
 
     <div class="admin-row">
       <label>API Key</label>
       <input type="password" class="admin-key-input" id="scrapeKey" placeholder="SCRAPE_API_KEY" />
+    </div>
+
+    <div class="admin-row">
+      <label>Λειτουργία</label>
+      <select id="scrapeMode" style="flex:1; width:auto;">
+        <option value="incremental" selected>Incremental — νέες ταινίες (γρήγορο)</option>
+        <option value="full">Full — ολόκληρο αρχείο (~17k ταινίες)</option>
+      </select>
     </div>
 
     <div class="admin-row">
@@ -289,16 +300,22 @@
       </select>
     </div>
 
+    <div class="admin-row admin-row-options">
+      <label class="admin-checkbox-label">
+        <input type="checkbox" id="skipTmdb" />
+        Παράλειψη TMDB (πιο γρήγορο, χωρίς βαθμολογίες/cast)
+      </label>
+    </div>
+
     <div class="admin-row">
       <button class="btn-admin-action accent" id="startScrapeBtn">▶ Έναρξη</button>
-      <button class="btn-admin-action"        id="refreshStatusBtn">↺ Status</button>
-      <button class="btn-admin-close"         id="adminClose">✕</button>
+      <button class="btn-admin-action" id="refreshStatusBtn">↺ Status</button>
     </div>
 
     <div class="admin-row" id="scrapeControlRow" style="display:none;">
       <button class="btn-admin-action btn-pause-scrape" id="pauseScrapeBtn">⏸ Παύση</button>
       <button class="btn-admin-action btn-resume-scrape" id="resumeScrapeBtn" style="display:none;">▶ Συνέχεια</button>
-      <button class="btn-admin-action btn-stop-scrape"  id="stopScrapeBtn">⏹ Stop</button>
+      <button class="btn-admin-action btn-stop-scrape" id="stopScrapeBtn">⏹ Stop</button>
     </div>
 
     <div class="admin-row" id="nextBatchRow" style="display:none;">
@@ -314,21 +331,23 @@
       <div class="progress-bar" id="scrapeProgressBar" style="width:0%"></div>
     </div>
     <div class="progress-label" id="scrapeProgressLabel"></div>
+    <div class="admin-current-movie" id="adminCurrentMovie" style="display:none;"></div>
     <div class="admin-status hidden" id="adminStatus"></div>
 
     <hr class="admin-divider" />
 
     <div class="admin-row">
-      <label>Test</label>
+      <label>Test Scrape</label>
       <select id="testScrapeSize" style="width:auto;">
         <option value="10">10 ταινίες</option>
         <option value="25" selected>25 ταινίες</option>
         <option value="50">50 ταινίες</option>
       </select>
-      <button class="btn-admin-action btn-test-scrape" id="testScrapeBtn">🧪 Test Scrape</button>
+      <button class="btn-admin-action btn-test-scrape" id="testScrapeBtn">🧪 Εκτέλεση</button>
     </div>
+    <div class="admin-hint">Διαγράφει τη βάση και κατεβάζει N ταινίες για δοκιμή.</div>
 
-    <div class="admin-row">
+    <div class="admin-row" style="margin-top:8px;">
       <button class="btn-admin-action btn-danger-scrape" id="clearDbBtn">🗑 Διαγραφή όλης της βάσης</button>
     </div>
 

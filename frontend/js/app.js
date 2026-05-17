@@ -748,33 +748,41 @@ document.getElementById('startScrapeBtn').addEventListener('click', async () => 
   const key       = document.getElementById('scrapeKey').value.trim();
   const batchVal  = document.getElementById('batchSize').value;
   const batchSize = batchVal ? parseInt(batchVal, 10) : null;
+  const mode      = document.getElementById('scrapeMode').value;
+  const skipTmdb  = document.getElementById('skipTmdb').checked;
   state.nextOffset = 0;
   state.batchSize  = batchSize;
-  await _startScrape(key, batchSize, 0);
+  state.scrapeMode = mode;
+  state.skipTmdb   = skipTmdb;
+  await _startScrape(key, batchSize, 0, mode, skipTmdb);
 });
 
 document.getElementById('nextBatchBtn').addEventListener('click', async () => {
   const key = document.getElementById('scrapeKey').value.trim();
   document.getElementById('nextBatchRow').style.display = 'none';
-  await _startScrape(key, state.batchSize, state.nextOffset);
+  await _startScrape(key, state.batchSize, state.nextOffset, state.scrapeMode, state.skipTmdb);
 });
 
-async function _startScrape(key, batchSize, offset) {
+async function _startScrape(key, batchSize, offset, mode, skipTmdb) {
   setAdminStatus('Εκκίνηση scraping…', 'info');
   try {
-    const body = { api_key: key };
+    const body = { api_key: key, mode: mode || 'incremental' };
     if (batchSize) body.batch_size = batchSize;
     if (offset)    body.offset     = offset;
+    if (skipTmdb)  body.skip_tmdb  = true;
     const res = await api('/api/scrape/start', {
       method: 'POST',
       body: JSON.stringify(body),
     });
     state.scrapeId = res.scrape_id;
-    const batchInfo = batchSize ? ` (batch ${Math.floor(offset / batchSize) + 1}, offset ${offset})` : '';
-    toast(`Scraping ξεκίνησε${batchInfo}!`, 'success');
+    const modeLabel = (mode === 'full') ? ' [Full]' : ' [Incremental]';
+    const batchInfo = batchSize ? ` — batch ${Math.floor(offset / batchSize) + 1}` : '';
+    const tmdbInfo  = skipTmdb ? ' — χωρίς TMDB' : '';
+    toast(`Scraping ξεκίνησε${modeLabel}${batchInfo}${tmdbInfo}!`, 'success');
     startTimer();
     startScrapePolling();
     _setScrapeActive(true);
+    document.getElementById('adminCurrentMovie').style.display = 'none';
   } catch (e) {
     setAdminStatus('Σφάλμα: ' + e.message, 'error');
   }
@@ -890,26 +898,47 @@ function _setScrapeActive(active) {
   }
 }
 
+function _movieNameFromUrl(url) {
+  if (!url) return null;
+  const m = url.match(/\/(\d+)(?:[/?#]|$)/);
+  return m ? `#${m[1]}` : null;
+}
+
+function _setCurrentMovie(url) {
+  const el = document.getElementById('adminCurrentMovie');
+  if (!url) { el.style.display = 'none'; return; }
+  const id = _movieNameFromUrl(url);
+  el.textContent = `Τρέχουσα: ${id || url}`;
+  el.style.display = '';
+}
+
 function updateScrapeUI(job) {
   if (!job) return;
 
   // Αν βρούμε running/paused job και δεν τρέχει ο timer, ξεκινάμε από started_at
-  if ((job.status === 'running' || job.status === 'paused') && !state.timerInterval) {
+  if ((job.status === 'running' || job.status === 'paused' || job.status === 'discovering') && !state.timerInterval) {
     if (job.started_at && !state.scrapeStartTime) {
       state.scrapeStartTime = new Date(job.started_at).getTime();
     }
     if (state.scrapeStartTime) startTimer();
-    if (job.status === 'running' || job.status === 'paused') _setScrapeActive(true);
+    _setScrapeActive(true);
   }
 
   const pct = job.total ? Math.round((job.done / job.total) * 100) : 0;
   const batchLabel = job.batch_size
-    ? ` — batch ${Math.floor((job.offset || 0) / job.batch_size) + 1} (offset ${job.offset || 0})`
+    ? ` — batch ${Math.floor((job.offset || 0) / job.batch_size) + 1}`
     : '';
   document.getElementById('scrapeProgressWrap').style.display = '';
   document.getElementById('scrapeProgressBar').style.width = pct + '%';
-  document.getElementById('scrapeProgressLabel').textContent =
-    `${job.done} / ${job.total} ταινίες${batchLabel} — σφάλματα: ${job.errors || 0}`;
+
+  if (job.status === 'discovering') {
+    document.getElementById('scrapeProgressLabel').textContent = 'Ανακάλυψη URLs… (αυτό μπορεί να πάρει λίγα λεπτά)';
+    _setCurrentMovie(null);
+  } else {
+    document.getElementById('scrapeProgressLabel').textContent =
+      `${job.done} / ${job.total || '?'} ταινίες${batchLabel} — σφάλματα: ${job.errors || 0}`;
+    _setCurrentMovie(job.current_url);
+  }
 
   const durationLabel = job.duration_formatted ? ` — Διάρκεια: ${job.duration_formatted}` : '';
 
@@ -917,6 +946,7 @@ function updateScrapeUI(job) {
     state.stopRequested = state.pauseRequested = false;
     setAdminStatus(`✓ Ολοκληρώθηκε: ${job.done} ταινίες αποθηκεύτηκαν${durationLabel}.`, 'success');
     document.getElementById('nextBatchRow').style.display = 'none';
+    _setCurrentMovie(null);
     stopScrapePolling();
     stopTimer();
     _setScrapeActive(false);
@@ -930,6 +960,7 @@ function updateScrapeUI(job) {
       'success',
     );
     document.getElementById('nextBatchRow').style.display = '';
+    _setCurrentMovie(null);
     stopScrapePolling();
     stopTimer();
     _setScrapeActive(false);
@@ -937,6 +968,7 @@ function updateScrapeUI(job) {
     state.stopRequested = state.pauseRequested = false;
     setAdminStatus(`⏹ Διακόπηκε: ${job.done} ταινίες αποθηκεύτηκαν${durationLabel}.`, 'info');
     document.getElementById('nextBatchRow').style.display = 'none';
+    _setCurrentMovie(null);
     stopScrapePolling();
     stopTimer();
     _setScrapeActive(false);
@@ -944,6 +976,7 @@ function updateScrapeUI(job) {
     state.stopRequested = state.pauseRequested = false;
     setAdminStatus(`✗ Σφάλμα: ${job.error_message || 'Άγνωστο'}${durationLabel}`, 'error');
     document.getElementById('nextBatchRow').style.display = 'none';
+    _setCurrentMovie(null);
     stopScrapePolling();
     stopTimer();
     _setScrapeActive(false);
@@ -951,7 +984,12 @@ function updateScrapeUI(job) {
     state.pauseRequested = false;
     document.getElementById('pauseScrapeBtn').style.display = 'none';
     document.getElementById('resumeScrapeBtn').style.display = '';
-    setAdminStatus(`⏸ Σε παύση — ${job.done} / ${job.total} ταινίες${durationLabel}`, 'info');
+    setAdminStatus(`⏸ Σε παύση — ${job.done} / ${job.total || '?'} ταινίες${durationLabel}`, 'info');
+    document.getElementById('nextBatchRow').style.display = 'none';
+  } else if (job.status === 'discovering') {
+    setAdminStatus('Ανακάλυψη URLs ταινιών… παρακαλώ περιμένετε', 'info');
+    document.getElementById('pauseScrapeBtn').style.display = '';
+    document.getElementById('resumeScrapeBtn').style.display = 'none';
     document.getElementById('nextBatchRow').style.display = 'none';
   } else {
     // job.status === 'running'

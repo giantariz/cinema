@@ -1196,9 +1196,50 @@ select option { background: var(--bg3); }
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: auto;
+  flex-shrink: 0;
 }
 .btn-admin-close:hover { border-color: var(--danger); color: var(--danger); }
+
+.admin-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.admin-header-row .admin-title { margin-bottom: 0; }
+
+.admin-row-options { flex-wrap: nowrap; }
+.admin-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text2);
+  cursor: pointer;
+}
+.admin-checkbox-label input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.admin-current-movie {
+  font-size: 0.78rem;
+  color: var(--text3);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-hint {
+  font-size: 0.78rem;
+  color: var(--text3);
+  margin-top: -8px;
+  margin-bottom: 10px;
+  padding-left: 2px;
+}
 
 /* ============================
    Toast
