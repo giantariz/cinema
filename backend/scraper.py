@@ -694,7 +694,7 @@ def _parse_tmdb_response(data: dict, tmdb_id: int) -> dict:
         "cast":                 cast,
         "cast_roles":           cast_roles,
         "description":          overview or None,
-        "imdb_score":           round(float(vote_avg), 1) if vote_avg else None,
+        "tmdb_score":           round(float(vote_avg), 1) if vote_avg else None,
         "vote_count":           vote_count or None,
         "imdb_url":             imdb_url,
         "imdb_id":              imdb_id,
@@ -764,7 +764,7 @@ def fetch_tmdb_data_by_id(tmdb_id: int) -> dict | None:
 
 _TMDB_MERGE_FIELDS = (
     "genre", "director", "cast", "cast_roles", "description",
-    "imdb_score", "vote_count", "imdb_url", "imdb_id",
+    "tmdb_score", "vote_count", "imdb_url", "imdb_id",
     "tagline", "backdrop_path", "original_language", "production_companies",
     "tmdb_trailer_key",
 )

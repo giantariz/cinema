@@ -226,7 +226,7 @@ def get_movie_imdb(movie_id: str):
 
 _ENRICH_FIELDS = (
     "genre", "director", "cast", "cast_roles", "description",
-    "imdb_score", "vote_count", "imdb_url", "imdb_id",
+    "tmdb_score", "vote_count", "imdb_url", "imdb_id",
     "tagline", "backdrop_path", "original_language", "production_companies",
     "tmdb_trailer_key",
 )
