@@ -315,6 +315,22 @@ def scrape_start():
         return jsonify({"error": "Μη έγκυρο mode. Χρησιμοποίησε 'full' ή 'incremental'"}), 400
 
     full_rescrape = bool(data.get("full_rescrape", False))
+
+    batch_size = data.get("batch_size")
+    if batch_size is not None:
+        try:
+            batch_size = int(batch_size)
+            if batch_size <= 0:
+                batch_size = None
+        except (ValueError, TypeError):
+            batch_size = None
+
+    offset = 0
+    try:
+        offset = int(data.get("offset", 0))
+    except (ValueError, TypeError):
+        offset = 0
+
     scrape_id = str(uuid.uuid4())
 
     # Εγγραφή job στο Firestore
@@ -323,12 +339,18 @@ def scrape_start():
     # Εκκίνηση σε background thread
     t = threading.Thread(
         target=scraper.run_scrape,
-        args=(scrape_id, mode, full_rescrape),
+        args=(scrape_id, mode, full_rescrape, batch_size, offset),
         daemon=True,
     )
     t.start()
 
-    return jsonify({"scrape_id": scrape_id, "status": "started", "mode": mode}), 202
+    return jsonify({
+        "scrape_id": scrape_id,
+        "status": "started",
+        "mode": mode,
+        "batch_size": batch_size,
+        "offset": offset,
+    }), 202
 
 
 @app.post("/api/scrape/test")
