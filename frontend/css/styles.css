@@ -443,6 +443,26 @@ select option { background: var(--bg3); }
 
 .stars-number { font-size: 0.72rem; color: var(--text2); }
 
+.card-tmdb-score {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.card-tmdb-score-value {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.card-tmdb-score-label {
+  font-size: 0.65rem;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .card-meta {
   font-size: 0.72rem;
   color: var(--text2);

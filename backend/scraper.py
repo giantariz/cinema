@@ -762,6 +762,27 @@ def fetch_tmdb_data_by_id(tmdb_id: int) -> dict | None:
         return None
 
 
+_TMDB_MERGE_FIELDS = (
+    "genre", "director", "cast", "cast_roles", "description",
+    "imdb_score", "vote_count", "imdb_url", "imdb_id",
+    "tagline", "backdrop_path", "original_language", "production_companies",
+    "tmdb_trailer_key",
+)
+
+
+def _apply_tmdb_to_movie(movie_data: dict, tmdb_data: dict) -> None:
+    """Εφαρμόζει TMDB δεδομένα στο movie dict (in-place). Δεν αντικαθιστά υπάρχοντα πεδία."""
+    movie_data["tmdb_id"] = tmdb_data["tmdb_id"]
+    for field in _TMDB_MERGE_FIELDS:
+        if tmdb_data.get(field) and not movie_data.get(field):
+            movie_data[field] = tmdb_data[field]
+    if tmdb_data.get("original_title") and not movie_data.get("title_original"):
+        movie_data["title_original"] = tmdb_data["original_title"]
+    if tmdb_data.get("year") and not movie_data.get("year"):
+        movie_data["year"] = tmdb_data["year"]
+    movie_data["tmdb_enriched_at"] = datetime.now(timezone.utc).isoformat()
+
+
 def run_scrape(scrape_id: str, mode: str = "full", full_rescrape: bool = False) -> None:
     """
     Εκτελεί scraping. Καλείται σε background thread.
@@ -800,6 +821,17 @@ def run_scrape(scrape_id: str, mode: str = "full", full_rescrape: bool = False) 
             try:
                 data = scrape_movie_details(movie_url)
                 if data:
+                    if TMDB_API_KEY:
+                        try:
+                            tmdb_data = find_tmdb_data(
+                                title=data.get("title", ""),
+                                original_title=data.get("title_original", ""),
+                                year=data.get("year"),
+                            )
+                            if tmdb_data:
+                                _apply_tmdb_to_movie(data, tmdb_data)
+                        except Exception as te:
+                            logger.warning("TMDB αποτυχία για '%s': %s", data.get("title"), te)
                     save_movie(data)
                     done += 1
                     logger.debug("✓ Αποθηκεύτηκε: %s (%s)", data.get("title"), movie_id)
@@ -866,6 +898,17 @@ def run_test_scrape(scrape_id: str, limit: int = 25) -> None:
             try:
                 data = scrape_movie_details(movie_url)
                 if data:
+                    if TMDB_API_KEY:
+                        try:
+                            tmdb_data = find_tmdb_data(
+                                title=data.get("title", ""),
+                                original_title=data.get("title_original", ""),
+                                year=data.get("year"),
+                            )
+                            if tmdb_data:
+                                _apply_tmdb_to_movie(data, tmdb_data)
+                        except Exception as te:
+                            logger.warning("TMDB αποτυχία για '%s': %s", data.get("title"), te)
                     save_movie(data)
                     done += 1
                     logger.debug("✓ Test: %s", data.get("title"))

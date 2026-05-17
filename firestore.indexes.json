@@ -4,8 +4,8 @@
       "collectionGroup": "movies",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "year",  "order": "DESCENDING" },
-        { "fieldPath": "stars", "order": "DESCENDING" }
+        { "fieldPath": "year",       "order": "DESCENDING" },
+        { "fieldPath": "imdb_score", "order": "DESCENDING" }
       ]
     },
     {
@@ -20,8 +20,8 @@
       "collectionGroup": "movies",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "year",  "order": "ASCENDING" },
-        { "fieldPath": "stars", "order": "DESCENDING" }
+        { "fieldPath": "year",       "order": "ASCENDING" },
+        { "fieldPath": "imdb_score", "order": "DESCENDING" }
       ]
     },
     {
@@ -36,16 +36,16 @@
       "collectionGroup": "movies",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "stars",    "order": "DESCENDING" },
-        { "fieldPath": "duration", "order": "DESCENDING" }
+        { "fieldPath": "imdb_score", "order": "DESCENDING" },
+        { "fieldPath": "duration",   "order": "DESCENDING" }
       ]
     },
     {
       "collectionGroup": "movies",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "country", "order": "ASCENDING" },
-        { "fieldPath": "stars",   "order": "DESCENDING" }
+        { "fieldPath": "country",    "order": "ASCENDING" },
+        { "fieldPath": "imdb_score", "order": "DESCENDING" }
       ]
     },
     {
