@@ -346,6 +346,49 @@ def get_latest_scrape_job() -> dict | None:
     return None
 
 
+def reset_scrape_jobs(scrape_id: str | None = None) -> list[str]:
+    """Κάνει reset σε scrape job(s), ώστε το admin panel να ξεκινά καθαρά νέο scraping."""
+    db = _get_db()
+    reset_ids: list[str] = []
+    reset_payload = {
+        "status": "reset",
+        "current_url": None,
+        "reset_at": _now_iso(),
+        "updated_at": _now_iso(),
+    }
+
+    if scrape_id:
+        ref = db.collection("scrape_jobs").document(scrape_id)
+        if ref.get().exists:
+            ref.set(reset_payload, merge=True)
+            reset_ids.append(scrape_id)
+        return reset_ids
+
+    docs = (
+        db.collection("scrape_jobs")
+        .order_by("started_at", direction=firestore.Query.DESCENDING)
+        .limit(10)
+        .stream()
+    )
+    active_statuses = {
+        "running",
+        "paused",
+        "discovering",
+        "batch_completed",
+        "stopped",
+        "error",
+        "completed",
+    }
+    for doc in docs:
+        status = (doc.to_dict() or {}).get("status")
+        if status in active_statuses:
+            doc.reference.set(reset_payload, merge=True)
+            reset_ids.append(doc.id)
+            # Το τελευταίο ορατό job αρκεί για να καθαρίσει το panel.
+            break
+    return reset_ids
+
+
 # ---------------------------------------------------------------------------
 # User movies (personal watchlist)
 # ---------------------------------------------------------------------------

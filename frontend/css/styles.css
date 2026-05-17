@@ -1168,6 +1168,8 @@ select option { background: var(--bg3); }
 .btn-admin-action.accent:hover { background: var(--accent2); }
 .btn-test-scrape { background: #7c3a00; border-color: #e07b00; color: #ffb347; font-weight: 600; }
 .btn-test-scrape:hover { background: #a35000; border-color: #ffb347; color: #fff; }
+.btn-reset-scrape { background: #1f2937; border-color: #64748b; color: #cbd5e1; font-weight: 600; }
+.btn-reset-scrape:hover { background: #334155; border-color: #94a3b8; color: #fff; }
 .btn-pause-scrape  { background: #5a4a00; border-color: #c9a800; color: #ffd740; font-weight: 600; }
 .btn-pause-scrape:hover  { background: #7a6400; border-color: #ffd740; color: #fff; }
 .btn-resume-scrape { background: #0a4a0a; border-color: #2da82d; color: #55cc88; font-weight: 600; }

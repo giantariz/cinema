@@ -424,6 +424,22 @@ def scrape_stop():
     return jsonify({"status": "stopped"}), 200
 
 
+@app.post("/api/scrape/reset")
+@require_scrape_key
+def scrape_reset():
+    """Reset του scrape panel και διακοπή τυχόν τρέχοντος job."""
+    data = request.get_json(force=True, silent=True) or {}
+    scrape_id = data.get("scrape_id")
+    try:
+        reset_ids = db.reset_scrape_jobs(scrape_id)
+        for job_id in reset_ids:
+            scraper.set_scrape_control(job_id, "stopped")
+        return jsonify({"status": "reset", "reset_ids": reset_ids}), 200
+    except Exception as e:
+        logger.error("Σφάλμα scrape_reset: %s", e)
+        return jsonify({"error": "Εσωτερικό σφάλμα"}), 500
+
+
 @app.post("/api/admin/clear-database")
 @require_scrape_key
 def clear_database():

@@ -24,6 +24,8 @@ const state = {
   batchSize: null,
   nextOffset: 0,
   currentMovie: null,
+  scrapeMode: 'incremental',
+  skipTmdb: false,
   currentMovieIndex: -1,
   movieList: [],
   userMovies: [],
@@ -775,6 +777,7 @@ async function _startScrape(key, batchSize, offset, mode, skipTmdb) {
       body: JSON.stringify(body),
     });
     state.scrapeId = res.scrape_id;
+    state.scrapeStartTime = null;
     const modeLabel = (mode === 'full') ? ' [Full]' : ' [Incremental]';
     const batchInfo = batchSize ? ` — batch ${Math.floor(offset / batchSize) + 1}` : '';
     const tmdbInfo  = skipTmdb ? ' — χωρίς TMDB' : '';
@@ -843,6 +846,8 @@ document.getElementById('stopScrapeBtn').addEventListener('click', async () => {
 
 document.getElementById('refreshStatusBtn').addEventListener('click', refreshScrapeStatus);
 
+document.getElementById('resetScrapeBtn').addEventListener('click', resetScrapePanel);
+
 document.getElementById('testScrapeBtn').addEventListener('click', async () => {
   const key   = document.getElementById('scrapeKey').value.trim();
   const limit = parseInt(document.getElementById('testScrapeSize').value, 10) || 25;
@@ -878,6 +883,48 @@ document.getElementById('clearDbBtn').addEventListener('click', async () => {
     toast('Σφάλμα διαγραφής: ' + e.message, 'error');
   }
 });
+
+
+async function resetScrapePanel() {
+  const key = document.getElementById('scrapeKey').value.trim();
+  const hasActiveJob = Boolean(state.scrapeId);
+  const msg = hasActiveJob
+    ? 'Να γίνει reset στο scraping panel; Αν υπάρχει job σε εξέλιξη θα σταλεί και εντολή stop.'
+    : 'Να καθαρίσει το scraping panel για νέο scrape;';
+  if (!confirm(msg)) return;
+
+  try {
+    if (key) {
+      await api('/api/scrape/reset', {
+        method: 'POST',
+        body: JSON.stringify({ api_key: key, scrape_id: state.scrapeId || undefined }),
+      });
+    }
+    _resetScrapeState();
+    setAdminStatus('↻ Έγινε reset. Μπορείς να ξεκινήσεις νέο scraping.', 'success');
+  } catch (e) {
+    toast('Σφάλμα reset: ' + e.message, 'error');
+  }
+}
+
+function _resetScrapeState() {
+  stopScrapePolling();
+  stopTimer();
+  state.scrapeId = null;
+  state.scrapeStartTime = null;
+  state.stopRequested = false;
+  state.pauseRequested = false;
+  state.nextOffset = 0;
+
+  document.getElementById('scrapeTimer').style.display = 'none';
+  document.getElementById('scrapeTimerValue').textContent = '00:00:00';
+  document.getElementById('scrapeProgressWrap').style.display = 'none';
+  document.getElementById('scrapeProgressBar').style.width = '0%';
+  document.getElementById('scrapeProgressLabel').textContent = '';
+  document.getElementById('nextBatchRow').style.display = 'none';
+  _setCurrentMovie(null);
+  _setScrapeActive(false);
+}
 
 async function refreshScrapeStatus() {
   try {
@@ -948,7 +995,10 @@ function updateScrapeUI(job) {
 
   const durationLabel = job.duration_formatted ? ` — Διάρκεια: ${job.duration_formatted}` : '';
 
-  if (job.status === 'completed') {
+  if (job.status === 'reset') {
+    _resetScrapeState();
+    setAdminStatus('↻ Το scraping είναι reset. Μπορείς να ξεκινήσεις νέο scrape.', 'info');
+  } else if (job.status === 'completed') {
     state.stopRequested = state.pauseRequested = false;
     const newCount = job.done || 0;
     const skipMsg  = job.skipped ? ` · ${job.skipped} ήδη υπήρχαν` : '';
