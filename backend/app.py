@@ -312,10 +312,13 @@ def scrape_start():
     data = request.get_json(force=True, silent=True) or {}
 
     mode = data.get("mode", "incremental")
-    if mode not in ("incremental", "full"):
+    if mode not in ("incremental", "full", "continue"):
         mode = "incremental"
 
     full_rescrape = bool(data.get("full_rescrape", False))
+    # Το Continue mode είναι πάντα συμπληρωματικό: δεν αντικαθιστά υπάρχουσες ταινίες.
+    if mode == "continue":
+        full_rescrape = False
     skip_tmdb = bool(data.get("skip_tmdb", False))
 
     batch_size = data.get("batch_size")

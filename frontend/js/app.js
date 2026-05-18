@@ -768,7 +768,9 @@ document.getElementById('nextBatchBtn').addEventListener('click', async () => {
 async function _startScrape(key, batchSize, offset, mode, skipTmdb) {
   setAdminStatus('Εκκίνηση scraping…', 'info');
   try {
-    const body = { api_key: key, mode: mode || 'incremental' };
+    const selectedMode = mode || 'incremental';
+    const body = { api_key: key, mode: selectedMode };
+    if (selectedMode === 'full') body.full_rescrape = true;
     if (batchSize) body.batch_size = batchSize;
     if (offset)    body.offset     = offset;
     if (skipTmdb)  body.skip_tmdb  = true;
@@ -778,7 +780,11 @@ async function _startScrape(key, batchSize, offset, mode, skipTmdb) {
     });
     state.scrapeId = res.scrape_id;
     state.scrapeStartTime = null;
-    const modeLabel = (mode === 'full') ? ' [Full]' : ' [Incremental]';
+    const modeLabel = selectedMode === 'full'
+      ? ' [Full Scrape]'
+      : selectedMode === 'continue'
+        ? ' [Continue where you left off]'
+        : ' [Incremental]';
     const batchInfo = batchSize ? ` — batch ${Math.floor(offset / batchSize) + 1}` : '';
     const tmdbInfo  = skipTmdb ? ' — χωρίς TMDB' : '';
     toast(`Scraping ξεκίνησε${modeLabel}${batchInfo}${tmdbInfo}!`, 'success');
@@ -1002,7 +1008,7 @@ function updateScrapeUI(job) {
     state.stopRequested = state.pauseRequested = false;
     const newCount = job.done || 0;
     const skipMsg  = job.skipped ? ` · ${job.skipped} ήδη υπήρχαν` : '';
-    const noNewMsg = newCount === 0 ? ' — Δοκίμασε Full mode για να βρεις νέες!' : '';
+    const noNewMsg = newCount === 0 ? ' — Η βάση φαίνεται ενημερωμένη ή δεν βρέθηκαν νέες ταινίες.' : '';
     setAdminStatus(`✓ Ολοκληρώθηκε: ${newCount} νέες ταινίες${skipMsg}${durationLabel}${noNewMsg}`, newCount > 0 ? 'success' : 'info');
     document.getElementById('nextBatchRow').style.display = 'none';
     _setCurrentMovie(null);

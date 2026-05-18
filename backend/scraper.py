@@ -408,7 +408,7 @@ def _extract_from_dirty_description(text: str) -> dict:
 def discover_movie_urls(mode: str = "full") -> Generator[str, None, None]:
     """
     Ανακαλύπτει URLs ταινιών από το αρχείο Athinorama.
-    mode='full' → όλο το αρχείο
+    mode='full' ή 'continue' → όλο το αρχείο
     mode='incremental' → μόνο τρέχων + προηγούμενος μήνας
     """
     if mode == "incremental":
@@ -1052,8 +1052,9 @@ def run_scrape(
 ) -> None:
     """
     Εκτελεί scraping. Καλείται σε background thread.
-    - mode: 'full' ή 'incremental'
+    - mode: 'full', 'incremental' ή 'continue'
     - full_rescrape: αν True, αντικαθιστά υπάρχοντα docs
+      (στο 'continue' αγνοείται και αποθηκεύονται μόνο όσα λείπουν)
     - batch_size: αν οριστεί, επεξεργάζεται μόνο τόσες ταινίες και σταματά
     - offset: παραλείπει τις πρώτες N ταινίες (για συνέχεια batch)
     - skip_tmdb: αν True, παρακάμπτει TMDB εμπλουτισμό (πιο γρήγορο scraping)
@@ -1075,7 +1076,7 @@ def run_scrape(
 
     try:
         # --- Φάση 1: Discovery (ή φόρτωση από Firestore cache) ---
-        if mode == "full":
+        if mode in ("full", "continue"):
             all_urls = None
 
             if offset > 0:
@@ -1088,7 +1089,7 @@ def run_scrape(
 
             if all_urls is None:
                 update_scrape_job(scrape_id, {"status": "discovering", "done": 0, "errors": 0})
-                logger.info("Discovery ταινιών (full mode)...")
+                logger.info("Discovery ταινιών (%s mode)...", mode)
                 all_urls = list(dict.fromkeys(discover_movie_urls("full")))
                 save_url_list_cache(all_urls)
                 logger.info("Discovery ολοκληρώθηκε: %d μοναδικά URLs αποθηκεύτηκαν στο Firestore", len(all_urls))
@@ -1112,7 +1113,28 @@ def run_scrape(
 
         # --- Φάση 2: Scraping ---
         # Batch-check ποιά IDs υπάρχουν ήδη, αντί για N ξεχωριστά Firestore reads
-        if not full_rescrape:
+        if mode == "continue":
+            all_ids = [_extract_id_from_url(u) for u in urls_to_process]
+            valid_ids = [id_ for id_ in all_ids if id_]
+            existing_ids = get_existing_movie_ids(valid_ids)
+            original_count = len(urls_to_process)
+            urls_to_process = [
+                u for u in urls_to_process
+                if (movie_id := _extract_id_from_url(u)) and movie_id not in existing_ids
+            ]
+            skipped = original_count - len(urls_to_process)
+            total_found = len(urls_to_process)
+            logger.info(
+                "Continue mode: %d υπάρχουν ήδη, απομένουν %d ταινίες",
+                skipped, total_found,
+            )
+            update_scrape_job(scrape_id, {
+                "total": total_found,
+                "done": done,
+                "skipped": skipped,
+                "errors": errors,
+            })
+        elif not full_rescrape:
             all_ids = [_extract_id_from_url(u) for u in urls_to_process]
             valid_ids = [id_ for id_ in all_ids if id_]
             existing_ids = get_existing_movie_ids(valid_ids)
@@ -1236,12 +1258,14 @@ def run_scrape(
 
     if stopped_by_user:
         final_status = "stopped"
-        next_offset = offset + processed_in_batch
+        next_offset = 0 if mode == "continue" else offset + processed_in_batch
     else:
         # Αν τελείωσε λόγω batch limit (done >= batch_size) → batch_completed, αλλιώς completed
         batch_hit_limit = batch_size and done >= batch_size
         final_status = "batch_completed" if batch_hit_limit else "completed"
-        next_offset = (offset + processed_in_batch) if batch_hit_limit else None
+        # Στο Continue mode ξαναξεκινάμε από την αρχή και φιλτράρουμε όσα υπάρχουν,
+        # ώστε να μη χαθεί τυχόν κενό που βρίσκεται πριν από το προηγούμενο offset.
+        next_offset = (0 if mode == "continue" else offset + processed_in_batch) if batch_hit_limit else None
 
     update_scrape_job(scrape_id, {
         "status": final_status,
