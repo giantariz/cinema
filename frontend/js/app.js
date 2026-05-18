@@ -778,7 +778,11 @@ async function _startScrape(key, batchSize, offset, mode, skipTmdb) {
     });
     state.scrapeId = res.scrape_id;
     state.scrapeStartTime = null;
-    const modeLabel = (mode === 'full') ? ' [Full]' : ' [Incremental]';
+    const modeLabel = mode === 'full'
+      ? ' [Full]'
+      : mode === 'continue'
+        ? ' [Continue where you left off]'
+        : ' [Incremental]';
     const batchInfo = batchSize ? ` — batch ${Math.floor(offset / batchSize) + 1}` : '';
     const tmdbInfo  = skipTmdb ? ' — χωρίς TMDB' : '';
     toast(`Scraping ξεκίνησε${modeLabel}${batchInfo}${tmdbInfo}!`, 'success');
@@ -971,7 +975,8 @@ function updateScrapeUI(job) {
     _setScrapeActive(true);
   }
 
-  const pct = job.total ? Math.round((job.done / job.total) * 100) : 0;
+  const processedForPct = (job.offset || 0) + (job.done || 0) + (job.skipped || 0) + (job.errors || 0);
+  const pct = job.total ? Math.min(100, Math.round((processedForPct / job.total) * 100)) : 0;
   const batchLabel = job.batch_size
     ? ` — batch ${Math.floor((job.offset || 0) / job.batch_size) + 1}`
     : '';
@@ -1002,7 +1007,7 @@ function updateScrapeUI(job) {
     state.stopRequested = state.pauseRequested = false;
     const newCount = job.done || 0;
     const skipMsg  = job.skipped ? ` · ${job.skipped} ήδη υπήρχαν` : '';
-    const noNewMsg = newCount === 0 ? ' — Δοκίμασε Full mode για να βρεις νέες!' : '';
+    const noNewMsg = newCount === 0 ? ' — Δοκίμασε Full ή Continue where you left off για να συμπληρώσεις τη βάση!' : '';
     setAdminStatus(`✓ Ολοκληρώθηκε: ${newCount} νέες ταινίες${skipMsg}${durationLabel}${noNewMsg}`, newCount > 0 ? 'success' : 'info');
     document.getElementById('nextBatchRow').style.display = 'none';
     _setCurrentMovie(null);

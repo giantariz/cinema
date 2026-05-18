@@ -312,7 +312,7 @@ def scrape_start():
     data = request.get_json(force=True, silent=True) or {}
 
     mode = data.get("mode", "incremental")
-    if mode not in ("incremental", "full"):
+    if mode not in ("incremental", "full", "continue"):
         mode = "incremental"
 
     full_rescrape = bool(data.get("full_rescrape", False))
