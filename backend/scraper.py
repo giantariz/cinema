@@ -409,6 +409,7 @@ def discover_movie_urls(mode: str = "full") -> Generator[str, None, None]:
     """
     Ανακαλύπτει URLs ταινιών από το αρχείο Athinorama.
     mode='full' → όλο το αρχείο
+    mode='continue' → όλο το αρχείο, ώστε να βρεθεί το πρώτο κενό στη βάση
     mode='incremental' → μόνο τρέχων + προηγούμενος μήνας
     """
     if mode == "incremental":
@@ -1052,7 +1053,7 @@ def run_scrape(
 ) -> None:
     """
     Εκτελεί scraping. Καλείται σε background thread.
-    - mode: 'full' ή 'incremental'
+    - mode: 'full', 'incremental' ή 'continue'
     - full_rescrape: αν True, αντικαθιστά υπάρχοντα docs
     - batch_size: αν οριστεί, επεξεργάζεται μόνο τόσες ταινίες και σταματά
     - offset: παραλείπει τις πρώτες N ταινίες (για συνέχεια batch)
@@ -1075,7 +1076,7 @@ def run_scrape(
 
     try:
         # --- Φάση 1: Discovery (ή φόρτωση από Firestore cache) ---
-        if mode == "full":
+        if mode in ("full", "continue"):
             all_urls = None
 
             if offset > 0:
@@ -1088,7 +1089,8 @@ def run_scrape(
 
             if all_urls is None:
                 update_scrape_job(scrape_id, {"status": "discovering", "done": 0, "errors": 0})
-                logger.info("Discovery ταινιών (full mode)...")
+                discovery_label = "continue mode" if mode == "continue" else "full mode"
+                logger.info("Discovery ταινιών (%s)...", discovery_label)
                 all_urls = list(dict.fromkeys(discover_movie_urls("full")))
                 save_url_list_cache(all_urls)
                 logger.info("Discovery ολοκληρώθηκε: %d μοναδικά URLs αποθηκεύτηκαν στο Firestore", len(all_urls))
@@ -1098,6 +1100,24 @@ def run_scrape(
             logger.info("Incremental discovery: %d URLs", len(all_urls))
 
         total_found = len(all_urls)
+
+        if mode == "continue" and offset <= 0 and not full_rescrape:
+            all_ids = [_extract_id_from_url(u) for u in all_urls]
+            valid_ids = [id_ for id_ in all_ids if id_]
+            existing_ids_for_resume = get_existing_movie_ids(valid_ids)
+            resume_offset = 0
+            for idx, movie_id in enumerate(all_ids):
+                if movie_id and movie_id in existing_ids_for_resume:
+                    resume_offset = idx + 1
+                    continue
+                break
+            if resume_offset > 0:
+                logger.info(
+                    "Continue mode: παράλειψη %d αρχικών URLs που υπάρχουν ήδη στη βάση",
+                    resume_offset,
+                )
+                offset = resume_offset
+
         urls_to_process = all_urls[offset:]
 
         update_scrape_job(scrape_id, {

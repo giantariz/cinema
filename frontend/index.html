@@ -282,9 +282,14 @@
     <div class="admin-row">
       <label>Λειτουργία</label>
       <select id="scrapeMode" style="flex:1; width:auto;">
-        <option value="incremental" selected>Incremental — νέες ταινίες (γρήγορο)</option>
-        <option value="full">Full — ολόκληρο αρχείο (~17k ταινίες)</option>
+        <option value="incremental" selected>Incremental Scrape — τελευταίοι 2 μήνες (γρήγορο)</option>
+        <option value="full">Full Scrape — ολόκληρο αρχείο (~17k ταινίες)</option>
+        <option value="continue">Continue where you left off — συμπλήρωση κενών</option>
       </select>
+    </div>
+
+    <div class="admin-hint">
+      Full Scrape σαρώνει όλο το αρχείο και προσπερνά όσα υπάρχουν ήδη. Incremental Scrape κοιτά μόνο τις πρόσφατες σελίδες. Continue where you left off βρίσκει το πρώτο κενό στη βάση και συνεχίζει μέχρι τέλους.
     </div>
 
     <div class="admin-row">

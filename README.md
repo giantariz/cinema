@@ -251,7 +251,7 @@ Health check.
 
 | Param | Default | Περιγραφή |
 |---|---|---|
-| `mode` | `incremental` | `incremental` (τελευταίοι 2 μήνες) ή `full` (ολόκληρο αρχείο) |
+| `mode` | `incremental` | `incremental` (τελευταίοι 2 μήνες), `full` (ολόκληρο αρχείο) ή `continue` (βρίσκει το πρώτο κενό και συμπληρώνει όσα λείπουν) |
 | `batch_size` | null (χωρίς όριο) | Πόσες **νέες** ταινίες να κατεβάσει πριν σταματήσει |
 | `offset` | `0` | Από ποια θέση URL να ξεκινήσει (για συνέχεια batch) |
 | `skip_tmdb` | `false` | `true` = παράλειψη TMDB enrichment (πιο γρήγορο) |
@@ -302,6 +302,7 @@ Sync από Google Sheets. Requires `Authorization: Bearer <SYNC_API_KEY>`.
 
 - Rate limiting: 1–2 δευτερόλεπτα delay μεταξύ requests
 - Incremental mode: αποφυγή άσκοπης επιβάρυνσης του server
+- Continue mode: επανεκκίνηση από το πρώτο κενό στη βάση και αποθήκευση μόνο ταινιών που λείπουν
 - Χρησιμοποίησε υπεύθυνα — όχι για εμπορική εκμετάλλευση
 
 Για εμπορική χρήση, επικοινώνησε με το athinorama.gr για API πρόσβαση.
@@ -327,7 +328,7 @@ Sync από Google Sheets. Requires `Authorization: Bearer <SYNC_API_KEY>`.
 ### v1.3 — Scraper Config & Fixes
 
 - **Bug fix**: Το scrape mode ήταν hardcoded σε `incremental` — τώρα επιλέγεται από το UI
-- **Mode selector**: `Incremental` (τελευταίοι 2 μήνες) ή `Full` (ολόκληρο αρχείο ~17k ταινίες)
+- **Mode selector**: `Incremental` (τελευταίοι 2 μήνες), `Full` (ολόκληρο αρχείο ~17k ταινίες) ή `Continue where you left off` (συνέχεια από το πρώτο κενό)
 - **Skip TMDB checkbox**: Παράλειψη TMDB enrichment για πολύ πιο γρήγορο scraping
 - **Διαχωρισμός done/skipped**: Το UI πλέον δείχνει ξεχωριστά "X νέες · Y ήδη υπήρχαν"
 - **batch_size βασισμένο σε νέες ταινίες**: Το batch limit μετράει πλέον μόνο τις νέες που κατεβάστηκαν, όχι τις ήδη υπάρχουσες
