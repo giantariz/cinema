@@ -251,11 +251,11 @@ Health check.
 
 | Param | Default | Περιγραφή |
 |---|---|---|
-| `mode` | `incremental` | `incremental` (τελευταίοι 2 μήνες) ή `full` (ολόκληρο αρχείο) |
+| `mode` | `incremental` | `incremental` (τελευταίοι 2 μήνες), `full` (ολόκληρο αρχείο) ή `continue` (σκανάρει όλο το αρχείο και περνάει μόνο όσα IDs λείπουν από τη βάση) |
 | `batch_size` | null (χωρίς όριο) | Πόσες **νέες** ταινίες να κατεβάσει πριν σταματήσει |
 | `offset` | `0` | Από ποια θέση URL να ξεκινήσει (για συνέχεια batch) |
 | `skip_tmdb` | `false` | `true` = παράλειψη TMDB enrichment (πιο γρήγορο) |
-| `full_rescrape` | `false` | `true` = αντικατάσταση ταινιών που υπάρχουν ήδη |
+| `full_rescrape` | `false` | `true` = αντικατάσταση ταινιών που υπάρχουν ήδη. Το UI το στέλνει αυτόματα μόνο στο Full Scrape, ενώ στο Continue αγνοείται και μένει `false`. |
 | `movie_timeout` | `60` | Timeout ανά ταινία σε δευτερόλεπτα |
 
 **Response fields:**
@@ -327,10 +327,10 @@ Sync από Google Sheets. Requires `Authorization: Bearer <SYNC_API_KEY>`.
 ### v1.3 — Scraper Config & Fixes
 
 - **Bug fix**: Το scrape mode ήταν hardcoded σε `incremental` — τώρα επιλέγεται από το UI
-- **Mode selector**: `Incremental` (τελευταίοι 2 μήνες) ή `Full` (ολόκληρο αρχείο ~17k ταινίες)
+- **Mode selector**: `Incremental` (τελευταίοι 2 μήνες), `Full Scrape` (ολόκληρο αρχείο ~17k ταινίες και ενημέρωση υπαρχόντων) ή `Continue where you left off` (συμπλήρωση μόνο των ταινιών που λείπουν)
 - **Skip TMDB checkbox**: Παράλειψη TMDB enrichment για πολύ πιο γρήγορο scraping
 - **Διαχωρισμός done/skipped**: Το UI πλέον δείχνει ξεχωριστά "X νέες · Y ήδη υπήρχαν"
-- **batch_size βασισμένο σε νέες ταινίες**: Το batch limit μετράει πλέον μόνο τις νέες που κατεβάστηκαν, όχι τις ήδη υπάρχουσες
+- **batch_size βασισμένο σε νέες ταινίες**: Το batch limit μετράει πλέον μόνο τις νέες που κατεβάστηκαν, όχι τις ήδη υπάρχουσες. Το UI υποστηρίζει επίσης batches 2000 και 3000 ταινιών.
 - **Configurable timeout & TMDB skip** μέσω API
 - **UI**: Current movie display, discovering status, καθαρότερο layout
 
